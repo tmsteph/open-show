@@ -216,7 +216,7 @@
         <div class="actions">
           <a class="btn" href="#">Rehearsal</a>
           <a class="btn" href="#">Outputs</a>
-          <a class="btn primary" href="#">GO</a>
+          <a class="btn primary" href="#" id="top-go">GO</a>
         </div>
       </div>
     </div>
@@ -228,51 +228,10 @@
         <section class="panel">
           <div class="panelHead">
             <h2>Cue List</h2>
-            <span class="meta">42 cues</span>
+            <span class="meta" id="cue-count">0 cues</span>
           </div>
           <div class="panelBody">
-            <div class="queue">
-              <div class="cue">
-                <div class="cueRow">
-                  <span class="cueId">Q-001</span>
-                  <span class="meta">PPT</span>
-                </div>
-                <div class="cueName">Welcome Loop</div>
-                <div class="cueMeta">Lobby video • 00:34 • Auto-continue</div>
-              </div>
-              <div class="cue active">
-                <div class="cueRow">
-                  <span class="cueId">Q-002</span>
-                  <span class="meta">PPT</span>
-                </div>
-                <div class="cueName">Keynote Deck</div>
-                <div class="cueMeta">Slide 12/54 • Confidence + Program</div>
-              </div>
-              <div class="cue">
-                <div class="cueRow">
-                  <span class="cueId">Q-003</span>
-                  <span class="meta">VID</span>
-                </div>
-                <div class="cueName">Brand Sizzle</div>
-                <div class="cueMeta">1080p • 01:10 • Fade 1.0s</div>
-              </div>
-              <div class="cue">
-                <div class="cueRow">
-                  <span class="cueId">Q-004</span>
-                  <span class="meta">IMG</span>
-                </div>
-                <div class="cueName">Break Slide</div>
-                <div class="cueMeta">Static • Auto blackout on advance</div>
-              </div>
-              <div class="cue">
-                <div class="cueRow">
-                  <span class="cueId">Q-005</span>
-                  <span class="meta">PPT</span>
-                </div>
-                <div class="cueName">Panel Deck</div>
-                <div class="cueMeta">Slides 1-26 • Speaker view</div>
-              </div>
-            </div>
+            <div class="queue" id="cue-list"></div>
           </div>
         </section>
 
@@ -283,16 +242,16 @@
           </div>
           <div class="panelBody">
             <div class="preview" aria-label="Program monitor">
-              <div class="previewBox">KEYNOTE_DECK_SLIDE_12</div>
+              <div class="previewBox" id="preview-label">NO_CUE_SELECTED</div>
             </div>
             <div class="transport">
-              <button class="ghost">BACK</button>
-              <div class="bigbtn">GO</div>
-              <button class="ghost">SKIP</button>
+              <button class="ghost" id="btn-back" type="button">BACK</button>
+              <button class="bigbtn" id="btn-go" type="button">GO</button>
+              <button class="ghost" id="btn-skip" type="button">SKIP</button>
             </div>
             <div class="footer">
               <div>Hotkeys: <span class="kbd">SPACE</span> GO • <span class="kbd">SHIFT</span> + <span class="kbd">SPACE</span> BACK</div>
-              <div>Status: <span style="color:var(--mint)">Ready</span></div>
+              <div>Status: <span style="color:var(--mint)" id="status-label">Ready</span></div>
             </div>
           </div>
         </section>
@@ -300,28 +259,25 @@
         <aside class="panel inspector">
           <div class="panelHead">
             <h2>Inspector</h2>
-            <span class="meta">Cue Q-002</span>
+            <span class="meta" id="inspector-title">Cue --</span>
           </div>
           <div class="panelBody">
             <div class="grid">
               <div class="stat">
                 <b>Outputs</b>
-                Program • Output 1<br />
-                Confidence • Output 2
+                <span id="inspector-outputs">Program • Output 1<br />Confidence • Output 2</span>
               </div>
               <div class="stat">
                 <b>Transitions</b>
-                Fade in 0.8s<br />
-                Fade out 0.4s
+                <span id="inspector-transitions">Fade in 0.8s<br />Fade out 0.4s</span>
               </div>
               <div class="stat">
                 <b>Notes</b>
-                Intro slide. Hold until presenter nods.
+                <span id="inspector-notes">Select a cue to view notes.</span>
               </div>
               <div class="stat">
                 <b>Safety</b>
-                Blackout on panic<br />
-                Replay safe
+                <span id="inspector-safety">Blackout on panic<br />Replay safe</span>
               </div>
             </div>
 
@@ -330,9 +286,9 @@
                 <span class="cueId">OUTPUTS</span>
                 <span class="meta">Health</span>
               </div>
-              <div class="cueMeta">Output 1 (HDMI) • 59.9 fps • OK</div>
-              <div class="cueMeta">Output 2 (USB-C) • 59.9 fps • OK</div>
-              <div class="cueMeta">Capture card • Idle</div>
+              <div class="cueMeta" id="health-output-1">Output 1 (HDMI) • 59.9 fps • OK</div>
+              <div class="cueMeta" id="health-output-2">Output 2 (USB-C) • 59.9 fps • OK</div>
+              <div class="cueMeta" id="health-output-3">Capture card • Idle</div>
             </div>
 
             <div style="margin-top:14px" class="cue">
@@ -340,14 +296,156 @@
                 <span class="cueId">ENGINE</span>
                 <span class="meta">System</span>
               </div>
-              <div class="cueMeta">Latency 18ms • No drops</div>
-              <div class="cueMeta">Sync: 2 nodes online</div>
-              <div class="cueMeta">Showfile autosave 10:24:58</div>
+              <div class="cueMeta" id="engine-latency">Latency 18ms • No drops</div>
+              <div class="cueMeta" id="engine-sync">Sync: 2 nodes online</div>
+              <div class="cueMeta" id="engine-save">Showfile autosave 10:24:58</div>
             </div>
           </div>
         </aside>
       </div>
     </div>
   </main>
+  <script>
+    const cues = [
+      {
+        id: "Q-001",
+        type: "PPT",
+        name: "Welcome Loop",
+        meta: "Lobby video • 00:34 • Auto-continue",
+        preview: "WELCOME_LOOP",
+        outputs: ["Program • Output 1", "Confidence • Output 2"],
+        transitions: ["Fade in 0.8s", "Fade out 0.4s"],
+        notes: "Lobby loop while doors open.",
+        safety: ["Blackout on panic", "Replay safe"]
+      },
+      {
+        id: "Q-002",
+        type: "PPT",
+        name: "Keynote Deck",
+        meta: "Slide 12/54 • Confidence + Program",
+        preview: "KEYNOTE_DECK_SLIDE_12",
+        outputs: ["Program • Output 1", "Confidence • Output 2"],
+        transitions: ["Cut", "Cut"],
+        notes: "Hold on intro slide until presenter nods.",
+        safety: ["Blackout on panic", "Replay safe"]
+      },
+      {
+        id: "Q-003",
+        type: "VID",
+        name: "Brand Sizzle",
+        meta: "1080p • 01:10 • Fade 1.0s",
+        preview: "BRAND_SIZZLE_1080P",
+        outputs: ["Program • Output 1", "Confidence • Output 2"],
+        transitions: ["Fade in 1.0s", "Fade out 1.0s"],
+        notes: "Trigger on walk-on.",
+        safety: ["Blackout on panic", "Replay safe"]
+      },
+      {
+        id: "Q-004",
+        type: "IMG",
+        name: "Break Slide",
+        meta: "Static • Auto blackout on advance",
+        preview: "BREAK_SLIDE",
+        outputs: ["Program • Output 1"],
+        transitions: ["Cut", "Fade out 0.5s"],
+        notes: "Auto blackout on advance.",
+        safety: ["Blackout on panic", "Replay safe"]
+      },
+      {
+        id: "Q-005",
+        type: "PPT",
+        name: "Panel Deck",
+        meta: "Slides 1-26 • Speaker view",
+        preview: "PANEL_DECK_SLIDE_1",
+        outputs: ["Program • Output 1", "Confidence • Output 2"],
+        transitions: ["Cut", "Cut"],
+        notes: "Load speaker view for panel.",
+        safety: ["Blackout on panic", "Replay safe"]
+      }
+    ];
+
+    let activeIndex = 1;
+
+    const cueList = document.getElementById("cue-list");
+    const cueCount = document.getElementById("cue-count");
+    const previewLabel = document.getElementById("preview-label");
+    const inspectorTitle = document.getElementById("inspector-title");
+    const inspectorOutputs = document.getElementById("inspector-outputs");
+    const inspectorTransitions = document.getElementById("inspector-transitions");
+    const inspectorNotes = document.getElementById("inspector-notes");
+    const inspectorSafety = document.getElementById("inspector-safety");
+    const statusLabel = document.getElementById("status-label");
+
+    function renderCueList(){
+      cueList.innerHTML = "";
+      cues.forEach((cue, index) => {
+        const item = document.createElement("div");
+        item.className = "cue" + (index === activeIndex ? " active" : "");
+        item.setAttribute("data-index", String(index));
+        item.innerHTML = `
+          <div class="cueRow">
+            <span class="cueId">${cue.id}</span>
+            <span class="meta">${cue.type}</span>
+          </div>
+          <div class="cueName">${cue.name}</div>
+          <div class="cueMeta">${cue.meta}</div>
+        `;
+        item.addEventListener("click", () => setActive(index));
+        cueList.appendChild(item);
+      });
+      cueCount.textContent = `${cues.length} cues`;
+    }
+
+    function setActive(index){
+      if(index < 0 || index >= cues.length) return;
+      activeIndex = index;
+      const cue = cues[activeIndex];
+      previewLabel.textContent = cue.preview;
+      inspectorTitle.textContent = `Cue ${cue.id}`;
+      inspectorOutputs.innerHTML = cue.outputs.join("<br />");
+      inspectorTransitions.innerHTML = cue.transitions.join("<br />");
+      inspectorNotes.textContent = cue.notes;
+      inspectorSafety.innerHTML = cue.safety.join("<br />");
+      statusLabel.textContent = "Ready";
+      renderCueList();
+    }
+
+    function goNext(){
+      const next = Math.min(activeIndex + 1, cues.length - 1);
+      setActive(next);
+    }
+
+    function goBack(){
+      const prev = Math.max(activeIndex - 1, 0);
+      setActive(prev);
+    }
+
+    function skipCue(){
+      const next = Math.min(activeIndex + 1, cues.length - 1);
+      setActive(next);
+      statusLabel.textContent = "Skipped";
+    }
+
+    document.getElementById("btn-go").addEventListener("click", goNext);
+    document.getElementById("btn-back").addEventListener("click", goBack);
+    document.getElementById("btn-skip").addEventListener("click", skipCue);
+    document.getElementById("top-go").addEventListener("click", (event) => {
+      event.preventDefault();
+      goNext();
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if(event.code === "Space" && !event.shiftKey){
+        event.preventDefault();
+        goNext();
+      }else if(event.code === "Space" && event.shiftKey){
+        event.preventDefault();
+        goBack();
+      }
+    });
+
+    renderCueList();
+    setActive(activeIndex);
+  </script>
 </body>
 </html>
