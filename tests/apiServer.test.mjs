@@ -74,3 +74,33 @@ test("api server deletes shows", async () => {
 
   await new Promise((resolve) => server.close(resolve));
 });
+
+test("api server stores and serves assets", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "openshow-api-"));
+  const store = createShowStore(path.join(dir, "shows.db.json"));
+  const server = createApiServer({ store });
+
+  await new Promise((resolve) => server.listen(0, resolve));
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const uploadResponse = await fetch(`${base}/api/assets`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      fileName: "stinger.wav",
+      contentType: "audio/wav",
+      dataBase64: Buffer.from("asset-bytes").toString("base64")
+    })
+  });
+  assert.equal(uploadResponse.status, 201);
+  const uploadBody = await uploadResponse.json();
+
+  const assetResponse = await fetch(`${base}${uploadBody.asset.uri}`);
+  assert.equal(assetResponse.status, 200);
+  assert.equal(assetResponse.headers.get("content-type"), "audio/wav");
+  const assetBytes = Buffer.from(await assetResponse.arrayBuffer()).toString("utf8");
+  assert.equal(assetBytes, "asset-bytes");
+
+  await new Promise((resolve) => server.close(resolve));
+});

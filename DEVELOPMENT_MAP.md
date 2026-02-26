@@ -123,6 +123,7 @@ Use 2-week iterations with this rhythm:
 4. [x] Add local showfile import in MVP UI to accelerate rehearsal testing with real content.
 5. [x] Add in-browser cue editor with add/update/delete/export for rehearsal-ready showfile iteration.
 6. [x] Add browser-side `Import Asset` action to attach files to cues during rehearsal prep.
+7. [x] Render imported cue assets in the MVP program preview (image/video/audio/PDF).
 
 ## Phase 1.5: Persistence + Access Control Foundation
 Goal: support multi-session show storage and controlled asset ingestion without blocking MVP rehearsal usage.
@@ -132,7 +133,7 @@ Deliverables
 - [x] Vercel preview compatibility for `/api` show persistence routes and browser same-origin API calls.
 - [x] MVP connectivity UX for persistence API (health check, endpoint config, actionable error states).
 - [ ] Operator authentication (single-tenant local accounts to start).
-- [ ] Asset upload API with server-managed storage paths and metadata.
+- [x] Asset upload API with server-managed storage paths and metadata.
 - [ ] Browser asset library panel wired to cue editor `asset.uri`.
 
 Exit Criteria
