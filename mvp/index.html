@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0d0c0b" />
+  <title>OpenShow MVP — Cue Playback</title>
+  <meta name="description" content="OpenShow MVP: browser-first cue playback, outputs, and show control." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg:#0d0c0b;
+      --bg2:#1a1714;
+      --panel:#15110e;
+      --panel2:#1f1a16;
+      --text:#f3efe9;
+      --muted:#c0b6aa;
+      --line:rgba(243,239,233,.12);
+      --accent:#ffb454;
+      --accent2:#ffdf9f;
+      --mint:#9af7d1;
+      --red:#ff7c7c;
+      --shadow:0 18px 36px rgba(0,0,0,.4);
+      --radius:16px;
+      --radius2:12px;
+      --sans:"Space Grotesk", system-ui, -apple-system, Segoe UI, sans-serif;
+      --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      color:var(--text);
+      background:
+        radial-gradient(900px 600px at 10% -10%, rgba(255,180,84,.12), transparent 60%),
+        radial-gradient(700px 500px at 90% 10%, rgba(154,247,209,.12), transparent 60%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+      min-height:100vh;
+    }
+    .wrap{max-width:1400px;margin:0 auto;padding:0 18px}
+    header{
+      position:sticky; top:0; z-index:20;
+      background: linear-gradient(180deg, rgba(13,12,11,.92), rgba(13,12,11,.62));
+      border-bottom:1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+    .topbar{
+      display:grid; grid-template-columns: 1fr auto 1fr;
+      align-items:center; gap:14px;
+      padding:14px 0;
+    }
+    .brand{display:flex; align-items:center; gap:12px}
+    .logo{
+      width:36px; height:36px; border-radius:10px;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,223,159,.7), transparent 55%),
+        radial-gradient(circle at 70% 40%, rgba(154,247,209,.6), transparent 60%),
+        linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.2);
+      box-shadow: var(--shadow);
+    }
+    .title b{letter-spacing:.4px}
+    .meta{font-size:12px; color:var(--muted)}
+    .status{
+      display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+      font-size:12px; color:var(--muted);
+    }
+    .pill{
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      padding:6px 10px; border-radius:999px;
+    }
+    .actions{
+      display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;
+    }
+    .btn{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 12px; border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color:var(--text); text-decoration:none;
+      font-size:13px;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+    }
+    .btn:hover{transform:translateY(-1px); background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18)}
+    .btn.primary{
+      background: linear-gradient(135deg, rgba(255,180,84,.25), rgba(255,223,159,.22));
+      border-color: rgba(255,223,159,.3);
+      color: #1a130a;
+      font-weight:600;
+    }
+
+    main{padding:18px 0 26px}
+    .layout{
+      display:grid; gap:14px;
+      grid-template-columns: 300px minmax(0, 1fr) 320px;
+      align-items:start;
+    }
+    @media (max-width: 1200px){
+      .layout{grid-template-columns: 260px minmax(0, 1fr)}
+      .inspector{grid-column: 1 / -1}
+    }
+    @media (max-width: 900px){
+      .layout{grid-template-columns: 1fr}
+    }
+
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .panel h2{
+      margin:0; font-size:15px; letter-spacing:.2px;
+    }
+    .panelHead{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px; border-bottom:1px solid var(--line);
+    }
+    .panelBody{padding:14px}
+
+    .queue{display:grid; gap:10px}
+    .cue{
+      padding:10px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.03);
+      display:grid; gap:6px;
+    }
+    .cue.active{
+      border-color: rgba(255,223,159,.4);
+      background: rgba(255,223,159,.12);
+    }
+    .cueRow{display:flex; align-items:center; justify-content:space-between; gap:8px}
+    .cueId{
+      font-family:var(--mono); font-size:11px; color:var(--accent2);
+    }
+    .cueName{font-weight:600}
+    .cueMeta{font-size:12px; color:var(--muted); line-height:1.4}
+
+    .preview{
+      background: linear-gradient(135deg, rgba(255,180,84,.08), rgba(154,247,209,.08));
+      border-radius: var(--radius);
+      border:1px solid rgba(255,255,255,.12);
+      height:360px; display:flex; align-items:center; justify-content:center;
+      color: rgba(255,255,255,.85);
+      font-size:14px;
+    }
+    .previewBox{
+      width:86%; height:70%;
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(10,10,10,.7), rgba(30,24,18,.6));
+      border:1px solid rgba(255,255,255,.14);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:600; letter-spacing:.4px;
+    }
+
+    .grid{
+      display:grid; gap:12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    @media (max-width: 900px){
+      .grid{grid-template-columns:1fr}
+    }
+
+    .stat{
+      padding:10px; border-radius:12px; border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      display:grid; gap:6px;
+      font-size:12px; color:var(--muted);
+    }
+    .stat b{color:var(--text); font-size:14px}
+
+    .transport{
+      margin-top:12px; display:flex; align-items:center; justify-content:space-between;
+      gap:12px; flex-wrap:wrap;
+    }
+    .bigbtn{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:120px; height:46px; border-radius:14px;
+      border:1px solid rgba(255,223,159,.4);
+      background: linear-gradient(135deg, rgba(255,180,84,.35), rgba(255,223,159,.3));
+      color:#1a130a; font-weight:700; letter-spacing:.4px;
+      box-shadow: 0 10px 22px rgba(255,180,84,.2);
+    }
+    .ghost{
+      padding:10px 14px; border-radius:12px; border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      color:var(--text); font-weight:600;
+    }
+
+    .footer{
+      margin-top:18px; color:var(--muted); font-size:12px;
+      display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;
+    }
+    .kbd{font-family:var(--mono); background: rgba(255,255,255,.06); padding:2px 6px; border-radius:8px; border:1px solid var(--line)}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div class="title">
+            <b>OpenShow MVP</b>
+            <div class="meta">Cue Playback + Outputs • QLab-class workflow</div>
+          </div>
+        </div>
+        <div class="status">
+          <span class="pill">Showfile: ACME_2026_Q1.oshow</span>
+          <span class="pill">Outputs: 2 online</span>
+          <span class="pill">Engine: healthy</span>
+        </div>
+        <div class="actions">
+          <a class="btn" href="#">Rehearsal</a>
+          <a class="btn" href="#">Outputs</a>
+          <a class="btn primary" href="#">GO</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div class="layout">
+        <section class="panel">
+          <div class="panelHead">
+            <h2>Cue List</h2>
+            <span class="meta">42 cues</span>
+          </div>
+          <div class="panelBody">
+            <div class="queue">
+              <div class="cue">
+                <div class="cueRow">
+                  <span class="cueId">Q-001</span>
+                  <span class="meta">PPT</span>
+                </div>
+                <div class="cueName">Welcome Loop</div>
+                <div class="cueMeta">Lobby video • 00:34 • Auto-continue</div>
+              </div>
+              <div class="cue active">
+                <div class="cueRow">
+                  <span class="cueId">Q-002</span>
+                  <span class="meta">PPT</span>
+                </div>
+                <div class="cueName">Keynote Deck</div>
+                <div class="cueMeta">Slide 12/54 • Confidence + Program</div>
+              </div>
+              <div class="cue">
+                <div class="cueRow">
+                  <span class="cueId">Q-003</span>
+                  <span class="meta">VID</span>
+                </div>
+                <div class="cueName">Brand Sizzle</div>
+                <div class="cueMeta">1080p • 01:10 • Fade 1.0s</div>
+              </div>
+              <div class="cue">
+                <div class="cueRow">
+                  <span class="cueId">Q-004</span>
+                  <span class="meta">IMG</span>
+                </div>
+                <div class="cueName">Break Slide</div>
+                <div class="cueMeta">Static • Auto blackout on advance</div>
+              </div>
+              <div class="cue">
+                <div class="cueRow">
+                  <span class="cueId">Q-005</span>
+                  <span class="meta">PPT</span>
+                </div>
+                <div class="cueName">Panel Deck</div>
+                <div class="cueMeta">Slides 1-26 • Speaker view</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHead">
+            <h2>Program Preview</h2>
+            <span class="meta">Program + Confidence</span>
+          </div>
+          <div class="panelBody">
+            <div class="preview" aria-label="Program monitor">
+              <div class="previewBox">KEYNOTE_DECK_SLIDE_12</div>
+            </div>
+            <div class="transport">
+              <button class="ghost">BACK</button>
+              <div class="bigbtn">GO</div>
+              <button class="ghost">SKIP</button>
+            </div>
+            <div class="footer">
+              <div>Hotkeys: <span class="kbd">SPACE</span> GO • <span class="kbd">SHIFT</span> + <span class="kbd">SPACE</span> BACK</div>
+              <div>Status: <span style="color:var(--mint)">Ready</span></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel inspector">
+          <div class="panelHead">
+            <h2>Inspector</h2>
+            <span class="meta">Cue Q-002</span>
+          </div>
+          <div class="panelBody">
+            <div class="grid">
+              <div class="stat">
+                <b>Outputs</b>
+                Program • Output 1<br />
+                Confidence • Output 2
+              </div>
+              <div class="stat">
+                <b>Transitions</b>
+                Fade in 0.8s<br />
+                Fade out 0.4s
+              </div>
+              <div class="stat">
+                <b>Notes</b>
+                Intro slide. Hold until presenter nods.
+              </div>
+              <div class="stat">
+                <b>Safety</b>
+                Blackout on panic<br />
+                Replay safe
+              </div>
+            </div>
+
+            <div style="margin-top:14px" class="cue">
+              <div class="cueRow">
+                <span class="cueId">OUTPUTS</span>
+                <span class="meta">Health</span>
+              </div>
+              <div class="cueMeta">Output 1 (HDMI) • 59.9 fps • OK</div>
+              <div class="cueMeta">Output 2 (USB-C) • 59.9 fps • OK</div>
+              <div class="cueMeta">Capture card • Idle</div>
+            </div>
+
+            <div style="margin-top:14px" class="cue">
+              <div class="cueRow">
+                <span class="cueId">ENGINE</span>
+                <span class="meta">System</span>
+              </div>
+              <div class="cueMeta">Latency 18ms • No drops</div>
+              <div class="cueMeta">Sync: 2 nodes online</div>
+              <div class="cueMeta">Showfile autosave 10:24:58</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
