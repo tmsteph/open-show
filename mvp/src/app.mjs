@@ -5,7 +5,8 @@ import { parseShowfileText } from "./showfileLoader.mjs";
 import { parseShowfileObject } from "./showfileLoader.mjs";
 import { createImportedAssetRecord } from "./assetImport.mjs";
 import { createRunStatusFeed } from "./runStatus.mjs";
-import { loadShowFromApi, saveShowToApi } from "./showApiClient.mjs";
+import { loadShowFromApi, pingApiHealth, saveShowToApi } from "./showApiClient.mjs";
+import { formatApiError, normalizeApiBase } from "./apiUx.mjs";
 import {
   EDITOR_CUE_TYPES,
   createCueDraft,
@@ -25,6 +26,7 @@ const inspectorSafety = document.getElementById("inspector-safety");
 const statusLabel = document.getElementById("status-label");
 const showfilePill = document.getElementById("showfile-pill");
 const outputsPill = document.getElementById("outputs-pill");
+const apiStatusPill = document.getElementById("api-status-pill");
 const importButton = document.getElementById("import-showfile");
 const showfileInput = document.getElementById("showfile-input");
 const editorForm = document.getElementById("cue-editor-form");
@@ -36,6 +38,8 @@ const assetFileInput = document.getElementById("asset-file-input");
 const exportButton = document.getElementById("export-showfile");
 const saveToDbButton = document.getElementById("save-to-db");
 const loadFromDbButton = document.getElementById("load-from-db");
+const testApiButton = document.getElementById("test-api");
+const apiBaseInput = document.getElementById("api-base-input");
 const showIdInput = document.getElementById("show-id-input");
 const globalNotesInput = document.getElementById("global-notes");
 const saveGlobalNotesButton = document.getElementById("save-global-notes");
@@ -50,6 +54,7 @@ let cueState = createCueState(currentCues, 1);
 let globalNotesText = "";
 const runStatusFeed = createRunStatusFeed();
 showIdInput.value = "edited-mvp-show";
+apiBaseInput.value = "http://localhost:4173";
 
 for (const type of EDITOR_CUE_TYPES) {
   const option = document.createElement("option");
@@ -133,6 +138,15 @@ function pushStatus(message, level = "info") {
 function syncPills() {
   showfilePill.textContent = `Showfile: ${currentShowTitle}`;
   outputsPill.textContent = `Outputs: ${currentOutputCount} online`;
+}
+
+function getApiBase() {
+  return normalizeApiBase(apiBaseInput.value);
+}
+
+function setApiStatus(isOnline) {
+  apiStatusPill.textContent = `API: ${isOnline ? "online" : "offline"}`;
+  apiStatusPill.style.color = isOnline ? "var(--mint)" : "var(--red)";
 }
 
 function readEditorDraft() {
@@ -389,13 +403,15 @@ saveToDbButton.addEventListener("click", async (event) => {
     if (showIdInput.value.trim()) {
       showfile.metadata.showId = showIdInput.value.trim();
     }
-    const storedShow = await saveShowToApi(showfile);
+    const storedShow = await saveShowToApi(showfile, { apiBase: getApiBase() });
     showIdInput.value = storedShow.showId;
     currentShowTitle = storedShow.title;
     syncPills();
+    setApiStatus(true);
     pushStatus(`Saved show to DB: ${storedShow.showId}`);
   } catch (error) {
-    pushStatus(`DB save failed: ${error.message}`, "error");
+    setApiStatus(false);
+    pushStatus(formatApiError("DB save", error, getApiBase()), "error");
   }
 });
 
@@ -408,12 +424,26 @@ loadFromDbButton.addEventListener("click", async (event) => {
   }
 
   try {
-    const storedShow = await loadShowFromApi(showId);
+    const storedShow = await loadShowFromApi(showId, { apiBase: getApiBase() });
     const viewModel = parseShowfileObject(storedShow.showfile);
     setLoadedShowfile(viewModel);
+    setApiStatus(true);
     pushStatus(`Loaded show from DB: ${showId}`);
   } catch (error) {
-    pushStatus(`DB load failed: ${error.message}`, "error");
+    setApiStatus(false);
+    pushStatus(formatApiError("DB load", error, getApiBase()), "error");
+  }
+});
+
+testApiButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  try {
+    await pingApiHealth({ apiBase: getApiBase() });
+    setApiStatus(true);
+    pushStatus(`API online at ${getApiBase()}`);
+  } catch (error) {
+    setApiStatus(false);
+    pushStatus(formatApiError("API check", error, getApiBase()), "error");
   }
 });
 
@@ -434,5 +464,6 @@ window.addEventListener("keydown", (event) => {
 });
 
 syncPills();
+setApiStatus(false);
 applySnapshot(cueState.getSnapshot());
 pushStatus("Session ready");
