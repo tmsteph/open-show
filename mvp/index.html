@@ -138,6 +138,47 @@
     }
     .cueName{font-weight:600}
     .cueMeta{font-size:12px; color:var(--muted); line-height:1.4}
+    .editor{
+      margin-top:14px;
+      border-top:1px solid var(--line);
+      padding-top:12px;
+      display:grid;
+      gap:10px;
+    }
+    .editor label{
+      display:grid;
+      gap:4px;
+      font-size:11px;
+      color:var(--muted);
+      font-family:var(--mono);
+      text-transform:uppercase;
+      letter-spacing:.3px;
+    }
+    .editor input,
+    .editor select,
+    .editor textarea{
+      width:100%;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      border-radius:10px;
+      color:var(--text);
+      padding:8px 10px;
+      font:500 13px/1.4 var(--sans);
+    }
+    .editor textarea{
+      min-height:54px;
+      resize:vertical;
+    }
+    .editorRow{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+    .editorActions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
 
     .preview{
       background: linear-gradient(135deg, rgba(255,180,84,.08), rgba(154,247,209,.08));
@@ -234,6 +275,50 @@
           </div>
           <div class="panelBody">
             <div class="queue" id="cue-list"></div>
+            <form class="editor" id="cue-editor-form">
+              <div class="editorRow">
+                <label>Cue ID
+                  <input name="id" required pattern="Q-[0-9]{3}" />
+                </label>
+                <label>Type
+                  <select name="type" id="editor-type"></select>
+                </label>
+              </div>
+              <label>Name
+                <input name="name" required />
+              </label>
+              <label>Meta
+                <input name="meta" />
+              </label>
+              <div class="editorRow">
+                <label>Preview
+                  <input name="preview" />
+                </label>
+                <label>Asset URI
+                  <input name="assetUri" placeholder="assets/audio/stinger.wav" />
+                </label>
+              </div>
+              <label>Outputs (one per line)
+                <textarea name="outputs"></textarea>
+              </label>
+              <div class="editorRow">
+                <label>Transitions
+                  <textarea name="transitions"></textarea>
+                </label>
+                <label>Safety
+                  <textarea name="safety"></textarea>
+                </label>
+              </div>
+              <label>Notes
+                <textarea name="notes"></textarea>
+              </label>
+              <div class="editorActions">
+                <button class="ghost" id="editor-new" type="button">New Cue</button>
+                <button class="ghost" type="submit">Save Cue</button>
+                <button class="ghost" id="editor-delete" type="button">Delete Cue</button>
+                <button class="ghost" id="export-showfile" type="button">Export JSON</button>
+              </div>
+            </form>
           </div>
         </section>
 

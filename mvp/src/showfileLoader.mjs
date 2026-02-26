@@ -11,14 +11,15 @@ function normalizeCue(cue, outputLabelById) {
 
   return {
     id: cue.id,
-    type: cue.type,
+    type: String(cue.type ?? "PPT").toUpperCase(),
     name: cue.name,
     meta: cue.meta ?? "No metadata",
     preview: cue.preview ?? cue.name,
     outputs: outputLabels.length > 0 ? outputLabels : ["Unassigned output"],
     transitions: Array.isArray(cue.transitions) && cue.transitions.length > 0 ? cue.transitions : ["Cut"],
     notes: cue.notes ?? "No notes.",
-    safety: Array.isArray(cue.safety) && cue.safety.length > 0 ? cue.safety : ["No safety notes"]
+    safety: Array.isArray(cue.safety) && cue.safety.length > 0 ? cue.safety : ["No safety notes"],
+    assetUri: cue.asset?.uri ?? ""
   };
 }
 
