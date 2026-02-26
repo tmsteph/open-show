@@ -17,11 +17,20 @@ const jsFiles = [
   "mvp/src/app.mjs",
   "mvp/src/cues.mjs",
   "mvp/src/cueState.mjs",
+  "mvp/src/hotkeys.mjs",
+  "mvp/src/assetImport.mjs",
+  "mvp/src/showfileLoader.mjs",
+  "mvp/src/showfileEditor.mjs",
   "scripts/lint.mjs",
   "scripts/validate-showfile.mjs",
   "tests/cueState.test.mjs",
+  "tests/hotkeys.test.mjs",
   "tests/showfileRuntime.test.mjs",
-  "tests/playbackSession.test.mjs"
+  "tests/playbackSession.test.mjs",
+  "tests/cueListState.test.mjs",
+  "tests/showfileLoader.test.mjs",
+  "tests/showfileEditor.test.mjs",
+  "tests/assetImport.test.mjs"
 ];
 
 async function main() {

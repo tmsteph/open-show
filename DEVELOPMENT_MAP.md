@@ -120,3 +120,18 @@ Use 2-week iterations with this rhythm:
 1. [x] Implement cue list CRUD in app state (`PPT`, `IMG`, `VID`, `BLACK`, `FREEZE`).
 2. [x] Add transport command handling (`GO`, `BACK`, `SKIP`) with deterministic tests.
 3. [x] Add operator hotkeys for transport actions in the MVP UI.
+4. [x] Add local showfile import in MVP UI to accelerate rehearsal testing with real content.
+5. [x] Add in-browser cue editor with add/update/delete/export for rehearsal-ready showfile iteration.
+6. [x] Add browser-side `Import Asset` action to attach files to cues during rehearsal prep.
+
+## Phase 1.5: Persistence + Access Control Foundation
+Goal: support multi-session show storage and controlled asset ingestion without blocking MVP rehearsal usage.
+
+Deliverables
+- [ ] Minimal showfile database layer (create/read/update show metadata + cue payloads).
+- [ ] Operator authentication (single-tenant local accounts to start).
+- [ ] Asset upload API with server-managed storage paths and metadata.
+- [ ] Browser asset library panel wired to cue editor `asset.uri`.
+
+Exit Criteria
+- [ ] Operator can sign in, upload assets, and reload a show with persistent cues/assets across restarts.
