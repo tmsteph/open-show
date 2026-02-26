@@ -2,6 +2,7 @@ import { cues } from "./cues.mjs";
 import { createCueState } from "./cueState.mjs";
 import { getTransportCommandForKeyEvent } from "./hotkeys.mjs";
 import { parseShowfileText } from "./showfileLoader.mjs";
+import { createImportedAssetRecord } from "./assetImport.mjs";
 import {
   EDITOR_CUE_TYPES,
   createCueDraft,
@@ -27,6 +28,8 @@ const editorForm = document.getElementById("cue-editor-form");
 const editorType = document.getElementById("editor-type");
 const editorNewButton = document.getElementById("editor-new");
 const editorDeleteButton = document.getElementById("editor-delete");
+const editorImportAssetButton = document.getElementById("editor-import-asset");
+const assetFileInput = document.getElementById("asset-file-input");
 const exportButton = document.getElementById("export-showfile");
 
 let currentShowTitle = "ACME_2026_Q1.oshow";
@@ -241,6 +244,32 @@ editorDeleteButton.addEventListener("click", (event) => {
     replaceCueState(next.cues, next.activeIndex, "Cue deleted");
   } catch (error) {
     statusLabel.textContent = `Delete failed: ${error.message}`;
+  }
+});
+
+editorImportAssetButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  assetFileInput.click();
+});
+
+assetFileInput.addEventListener("change", (event) => {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  try {
+    const record = createImportedAssetRecord(file);
+    editorForm.elements.assetUri.value = record.assetUri;
+    editorForm.elements.type.value = record.suggestedType;
+    if (!editorForm.elements.preview.value) {
+      editorForm.elements.preview.value = file.name;
+    }
+    statusLabel.textContent = `Asset linked: ${file.name}`;
+  } catch (error) {
+    statusLabel.textContent = `Asset import failed: ${error.message}`;
+  } finally {
+    assetFileInput.value = "";
   }
 });
 

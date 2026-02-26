@@ -18,6 +18,7 @@ const jsFiles = [
   "mvp/src/cues.mjs",
   "mvp/src/cueState.mjs",
   "mvp/src/hotkeys.mjs",
+  "mvp/src/assetImport.mjs",
   "mvp/src/showfileLoader.mjs",
   "mvp/src/showfileEditor.mjs",
   "scripts/lint.mjs",
@@ -28,7 +29,8 @@ const jsFiles = [
   "tests/playbackSession.test.mjs",
   "tests/cueListState.test.mjs",
   "tests/showfileLoader.test.mjs",
-  "tests/showfileEditor.test.mjs"
+  "tests/showfileEditor.test.mjs",
+  "tests/assetImport.test.mjs"
 ];
 
 async function main() {
