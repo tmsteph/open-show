@@ -13,6 +13,23 @@ Useful commands:
 - `npm run validate:showfile`: validate sample showfile against schema.
 - `npm test`: run cue progression tests.
 - `npm run check`: run lint + schema validation + tests.
+- `npm run start:api`: run local show persistence API (`http://localhost:4173`).
+
+## Local Persistence API
+Start the backend:
+```bash
+npm run start:api
+```
+
+Available endpoints:
+- `GET /api/health`
+- `GET /api/shows`
+- `POST /api/shows` (create/update by `metadata.showId`)
+- `GET /api/shows/:showId`
+- `PUT /api/shows/:showId`
+- `DELETE /api/shows/:showId`
+
+The MVP UI now includes `Save to DB` and `Load from DB` actions that target `http://localhost:4173/api/shows` by default.
 
 ## Development Map
 - Primary execution plan: [`DEVELOPMENT_MAP.md`](/home/tmsteph/open-show/DEVELOPMENT_MAP.md)

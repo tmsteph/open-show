@@ -2,8 +2,10 @@ import { cues } from "./cues.mjs";
 import { createCueState } from "./cueState.mjs";
 import { getTransportCommandForKeyEvent } from "./hotkeys.mjs";
 import { parseShowfileText } from "./showfileLoader.mjs";
+import { parseShowfileObject } from "./showfileLoader.mjs";
 import { createImportedAssetRecord } from "./assetImport.mjs";
 import { createRunStatusFeed } from "./runStatus.mjs";
+import { loadShowFromApi, saveShowToApi } from "./showApiClient.mjs";
 import {
   EDITOR_CUE_TYPES,
   createCueDraft,
@@ -32,6 +34,9 @@ const editorDeleteButton = document.getElementById("editor-delete");
 const editorImportAssetButton = document.getElementById("editor-import-asset");
 const assetFileInput = document.getElementById("asset-file-input");
 const exportButton = document.getElementById("export-showfile");
+const saveToDbButton = document.getElementById("save-to-db");
+const loadFromDbButton = document.getElementById("load-from-db");
+const showIdInput = document.getElementById("show-id-input");
 const globalNotesInput = document.getElementById("global-notes");
 const saveGlobalNotesButton = document.getElementById("save-global-notes");
 const quickNoteInput = document.getElementById("quick-note-text");
@@ -44,6 +49,7 @@ let currentCues = cues;
 let cueState = createCueState(currentCues, 1);
 let globalNotesText = "";
 const runStatusFeed = createRunStatusFeed();
+showIdInput.value = "edited-mvp-show";
 
 for (const type of EDITOR_CUE_TYPES) {
   const option = document.createElement("option");
@@ -92,6 +98,10 @@ function createShowfileExport() {
     null,
     2
   );
+}
+
+function createShowfileObject() {
+  return JSON.parse(createShowfileExport());
 }
 
 function formatLogTime(isoString) {
@@ -246,6 +256,9 @@ function skipCue() {
 function setLoadedShowfile(viewModel) {
   currentShowTitle = viewModel.title;
   currentOutputCount = viewModel.outputCount;
+  if (viewModel.showId) {
+    showIdInput.value = viewModel.showId;
+  }
   syncPills();
   replaceCueState(viewModel.cues, 0, "Showfile loaded");
 }
@@ -367,6 +380,41 @@ exportButton.addEventListener("click", (event) => {
   link.remove();
   URL.revokeObjectURL(url);
   pushStatus("Exported edited-showfile.json");
+});
+
+saveToDbButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  try {
+    const showfile = createShowfileObject();
+    if (showIdInput.value.trim()) {
+      showfile.metadata.showId = showIdInput.value.trim();
+    }
+    const storedShow = await saveShowToApi(showfile);
+    showIdInput.value = storedShow.showId;
+    currentShowTitle = storedShow.title;
+    syncPills();
+    pushStatus(`Saved show to DB: ${storedShow.showId}`);
+  } catch (error) {
+    pushStatus(`DB save failed: ${error.message}`, "error");
+  }
+});
+
+loadFromDbButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  const showId = showIdInput.value.trim();
+  if (!showId) {
+    pushStatus("Enter a show id before loading", "error");
+    return;
+  }
+
+  try {
+    const storedShow = await loadShowFromApi(showId);
+    const viewModel = parseShowfileObject(storedShow.showfile);
+    setLoadedShowfile(viewModel);
+    pushStatus(`Loaded show from DB: ${showId}`);
+  } catch (error) {
+    pushStatus(`DB load failed: ${error.message}`, "error");
+  }
 });
 
 window.addEventListener("keydown", (event) => {

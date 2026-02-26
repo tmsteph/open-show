@@ -23,14 +23,7 @@ function normalizeCue(cue, outputLabelById) {
   };
 }
 
-export function parseShowfileText(text) {
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error("Showfile is not valid JSON");
-  }
-
+export function parseShowfileObject(parsed) {
   if (!parsed || typeof parsed !== "object") {
     throw new Error("Showfile must be an object");
   }
@@ -48,8 +41,20 @@ export function parseShowfileText(text) {
   );
 
   return {
+    showId: parsed.metadata?.showId ?? "",
     title: parsed.metadata?.title ?? "Imported Showfile",
     outputCount: parsed.outputs.length,
     cues: parsed.cues.map((cue) => normalizeCue(cue, outputLabelById))
   };
+}
+
+export function parseShowfileText(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Showfile is not valid JSON");
+  }
+
+  return parseShowfileObject(parsed);
 }

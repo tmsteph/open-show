@@ -8,7 +8,7 @@ Build a production-ready, browser-first show control platform, starting with a c
 ## Current Baseline
 - [x] Vision/architecture/roadmap landing page exists in [`index.html`](/home/tmsteph/open-show/index.html).
 - [x] Interactive MVP UI mock exists in [`mvp/index.html`](/home/tmsteph/open-show/mvp/index.html).
-- [ ] No backend engine, showfile persistence, or output control yet.
+- [ ] Backend output control is not implemented yet (basic showfile persistence API now exists).
 - [x] Minimal automated tests now cover cue progression logic.
 
 ## Phase Plan
@@ -128,7 +128,7 @@ Use 2-week iterations with this rhythm:
 Goal: support multi-session show storage and controlled asset ingestion without blocking MVP rehearsal usage.
 
 Deliverables
-- [ ] Minimal showfile database layer (create/read/update show metadata + cue payloads).
+- [x] Minimal showfile database layer (create/read/update show metadata + cue payloads).
 - [ ] Operator authentication (single-tenant local accounts to start).
 - [ ] Asset upload API with server-managed storage paths and metadata.
 - [ ] Browser asset library panel wired to cue editor `asset.uri`.
