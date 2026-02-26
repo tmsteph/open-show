@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createCueState } from "../mvp/src/cueState.mjs";
+import { createCueState } from "../src/engine/cueState.mjs";
 
 const cues = [
   { id: "Q-001", name: "One" },
