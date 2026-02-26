@@ -1,0 +1,49 @@
+import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { createSqliteShowStore } from "../src/server/sqliteShowStore.mjs";
+
+function buildShow(showId, title = "Test Show") {
+  return {
+    schemaVersion: "0.1.0",
+    metadata: {
+      showId,
+      title,
+      revision: 1,
+      createdAt: "2026-02-26T13:00:00Z"
+    },
+    outputs: [{ id: "out-program-1", name: "Program", role: "program", enabled: true }],
+    cues: [{ id: "Q-001", type: "PPT", name: "Opening", outputs: ["out-program-1"] }]
+  };
+}
+
+test("sqlite show store upserts and retrieves shows", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "openshow-sqlite-store-"));
+  const store = await createSqliteShowStore(path.join(dir, "shows.sqlite"));
+
+  await store.upsertShow("demo-show", buildShow("demo-show", "Demo"));
+  const show = await store.getShow("demo-show");
+  const shows = await store.listShows();
+
+  assert.equal(show.title, "Demo");
+  assert.equal(shows.length, 1);
+  assert.equal(shows[0].showId, "demo-show");
+
+  await store.close();
+});
+
+test("sqlite show store deletes records", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "openshow-sqlite-store-"));
+  const store = await createSqliteShowStore(path.join(dir, "shows.sqlite"));
+
+  await store.upsertShow("demo-show", buildShow("demo-show"));
+  const deleted = await store.deleteShow("demo-show");
+  const missing = await store.getShow("demo-show");
+
+  assert.equal(deleted, true);
+  assert.equal(missing, null);
+
+  await store.close();
+});

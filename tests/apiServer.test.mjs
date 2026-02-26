@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createApiServer } from "../src/server/apiServer.mjs";
-import { createShowStore } from "../src/server/showStore.mjs";
+import { createSqliteShowStore } from "../src/server/sqliteShowStore.mjs";
 
 function buildShow(showId, title = "Test Show") {
   return {
@@ -22,7 +22,7 @@ function buildShow(showId, title = "Test Show") {
 
 test("api server stores and returns shows", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "openshow-api-"));
-  const store = createShowStore(path.join(dir, "shows.db.json"));
+  const store = await createSqliteShowStore(path.join(dir, "shows.sqlite"));
   const server = createApiServer({ store });
 
   await new Promise((resolve) => server.listen(0, resolve));
@@ -49,11 +49,12 @@ test("api server stores and returns shows", async () => {
   assert.equal(getBody.show.showId, "sample-show");
 
   await new Promise((resolve) => server.close(resolve));
+  await store.close();
 });
 
 test("api server deletes shows", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "openshow-api-"));
-  const store = createShowStore(path.join(dir, "shows.db.json"));
+  const store = await createSqliteShowStore(path.join(dir, "shows.sqlite"));
   const server = createApiServer({ store });
 
   await new Promise((resolve) => server.listen(0, resolve));
@@ -73,4 +74,5 @@ test("api server deletes shows", async () => {
   assert.equal(missingResponse.status, 404);
 
   await new Promise((resolve) => server.close(resolve));
+  await store.close();
 });

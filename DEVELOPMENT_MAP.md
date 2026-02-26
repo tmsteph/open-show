@@ -128,7 +128,7 @@ Use 2-week iterations with this rhythm:
 Goal: support multi-session show storage and controlled asset ingestion without blocking MVP rehearsal usage.
 
 Deliverables
-- [x] Minimal showfile database layer (create/read/update show metadata + cue payloads).
+- [x] Minimal showfile database layer (SQLite-backed create/read/update show metadata + cue payloads).
 - [x] Vercel preview compatibility for `/api` show persistence routes and browser same-origin API calls.
 - [x] MVP connectivity UX for persistence API (health check, endpoint config, actionable error states).
 - [ ] Operator authentication (single-tenant local accounts to start).

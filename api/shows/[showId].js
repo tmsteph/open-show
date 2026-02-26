@@ -21,7 +21,7 @@ async function readJsonBody(req) {
 
 module.exports = async function handler(req, res) {
   const { getRuntimeShowStore } = await import("../../src/server/runtimeShowStore.mjs");
-  const store = getRuntimeShowStore();
+  const store = await getRuntimeShowStore();
   const showId = String(req.query?.showId ?? "").trim();
 
   if (!showId) {

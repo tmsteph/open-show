@@ -1,26 +1,27 @@
 import path from "node:path";
 import { createMemoryShowStore } from "./memoryShowStore.mjs";
-import { createShowStore } from "./showStore.mjs";
+import { createSqliteShowStore } from "./sqliteShowStore.mjs";
 
-function shouldUseMemoryStore() {
+function getStoreMode() {
   if (process.env.OPENSHOW_STORE_MODE === "memory") {
-    return true;
+    return "memory";
   }
-  if (process.env.OPENSHOW_STORE_MODE === "file") {
-    return false;
+  if (process.env.OPENSHOW_STORE_MODE === "sqlite") {
+    return "sqlite";
   }
-  return Boolean(process.env.VERCEL);
+  return process.env.VERCEL ? "memory" : "sqlite";
 }
 
-function getFileDbPath() {
-  return process.env.OPENSHOW_DB_PATH ?? path.join(process.cwd(), "data", "shows.db.json");
+function getSqliteDbPath() {
+  return process.env.OPENSHOW_DB_PATH ?? path.join(process.cwd(), "data", "openshow.sqlite");
 }
 
-export function getRuntimeShowStore() {
+export async function getRuntimeShowStore() {
   if (!globalThis.__openShowRuntimeStore) {
-    globalThis.__openShowRuntimeStore = shouldUseMemoryStore()
+    const mode = getStoreMode();
+    globalThis.__openShowRuntimeStore = mode === "memory"
       ? createMemoryShowStore()
-      : createShowStore(getFileDbPath());
+      : await createSqliteShowStore(getSqliteDbPath());
   }
 
   return globalThis.__openShowRuntimeStore;
