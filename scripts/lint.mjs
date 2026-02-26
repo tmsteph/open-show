@@ -11,6 +11,8 @@ const jsonFiles = [
 
 const jsFiles = [
   "src/app/playbackSession.mjs",
+  "src/server/showStore.mjs",
+  "src/server/apiServer.mjs",
   "src/engine/cueState.mjs",
   "src/engine/showfileRuntime.mjs",
   "src/adapters/output/nullOutputAdapter.mjs",
@@ -19,10 +21,12 @@ const jsFiles = [
   "mvp/src/cueState.mjs",
   "mvp/src/hotkeys.mjs",
   "mvp/src/assetImport.mjs",
+  "mvp/src/showApiClient.mjs",
   "mvp/src/runStatus.mjs",
   "mvp/src/showfileLoader.mjs",
   "mvp/src/showfileEditor.mjs",
   "scripts/lint.mjs",
+  "scripts/start-api.mjs",
   "scripts/validate-showfile.mjs",
   "tests/cueState.test.mjs",
   "tests/hotkeys.test.mjs",
@@ -32,7 +36,9 @@ const jsFiles = [
   "tests/showfileLoader.test.mjs",
   "tests/showfileEditor.test.mjs",
   "tests/assetImport.test.mjs",
-  "tests/runStatus.test.mjs"
+  "tests/runStatus.test.mjs",
+  "tests/showStore.test.mjs",
+  "tests/apiServer.test.mjs"
 ];
 
 async function main() {

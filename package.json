@@ -4,6 +4,7 @@
   "private": true,
   "description": "OpenShow browser-first playback MVP",
   "scripts": {
+    "start:api": "node scripts/start-api.mjs",
     "lint": "node scripts/lint.mjs",
     "validate:showfile": "node scripts/validate-showfile.mjs fixtures/sample-showfile.json docs/showfile.schema.json",
     "test": "node --test",
