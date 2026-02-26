@@ -1,5 +1,6 @@
 import { cues } from "./cues.mjs";
 import { createCueState } from "./cueState.mjs";
+import { getTransportCommandForKeyEvent } from "./hotkeys.mjs";
 
 const cueList = document.getElementById("cue-list");
 const cueCount = document.getElementById("cue-count");
@@ -66,12 +67,18 @@ document.getElementById("top-go").addEventListener("click", (event) => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (event.code === "Space" && !event.shiftKey) {
-    event.preventDefault();
+  const command = getTransportCommandForKeyEvent(event);
+  if (!command) {
+    return;
+  }
+
+  event.preventDefault();
+  if (command === "GO") {
     goNext();
-  } else if (event.code === "Space" && event.shiftKey) {
-    event.preventDefault();
+  } else if (command === "BACK") {
     goBack();
+  } else if (command === "SKIP") {
+    skipCue();
   }
 });
 

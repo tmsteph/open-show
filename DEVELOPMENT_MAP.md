@@ -119,4 +119,4 @@ Use 2-week iterations with this rhythm:
 ## Next Sprint (Phase 1 Kickoff)
 1. [x] Implement cue list CRUD in app state (`PPT`, `IMG`, `VID`, `BLACK`, `FREEZE`).
 2. [x] Add transport command handling (`GO`, `BACK`, `SKIP`) with deterministic tests.
-3. [ ] Add operator hotkeys for transport actions in the MVP UI.
+3. [x] Add operator hotkeys for transport actions in the MVP UI.
