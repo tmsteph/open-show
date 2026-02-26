@@ -47,3 +47,8 @@ Deliver a browser-first playback system that can run a corporate show cue stack 
 - Transport behavior is deterministic and test-covered.
 - At least one sample showfile validates against schema.
 - README includes local run and verification commands.
+
+## Phase 1 Scope Freeze
+- Freeze date: 2026-02-26.
+- This document defines the locked scope for Phase 1 implementation and acceptance.
+- Any scope additions or removals require a roadmap update in `DEVELOPMENT_MAP.md` and explicit note in this spec.

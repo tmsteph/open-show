@@ -23,7 +23,7 @@ Deliverables
 - [x] CI basics (lint + test on pull requests).
 
 Exit Criteria
-- [ ] MVP scope is frozen for Phase 1.
+- [x] MVP scope is frozen for Phase 1.
 - [x] At least one sample showfile validates against schema.
 
 ## Phase 1: Corporate Playback MVP
@@ -115,3 +115,8 @@ Use 2-week iterations with this rhythm:
 3. [x] Split current MVP demo into app shell + state model modules.
 4. [x] Add a minimal test harness for cue progression logic.
 5. [x] Document run commands and architecture notes in README.
+
+## Next Sprint (Phase 1 Kickoff)
+1. [ ] Implement cue list CRUD in app state (`PPT`, `IMG`, `VID`, `BLACK`, `FREEZE`).
+2. [ ] Add transport command handling (`GO`, `BACK`, `SKIP`) with deterministic tests.
+3. [ ] Add operator hotkeys for transport actions in the MVP UI.
