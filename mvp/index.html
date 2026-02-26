@@ -236,6 +236,28 @@
       display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;
     }
     .kbd{font-family:var(--mono); background: rgba(255,255,255,.06); padding:2px 6px; border-radius:8px; border:1px solid var(--line)}
+    .runNotes{
+      margin-top:14px;
+      display:grid;
+      gap:8px;
+    }
+    .runNotes textarea,
+    .runNotes input{
+      width:100%;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      border-radius:10px;
+      color:var(--text);
+      padding:8px 10px;
+      font:500 13px/1.4 var(--sans);
+    }
+    .statusLog{
+      max-height:170px;
+      overflow:auto;
+      display:grid;
+      gap:4px;
+      padding-right:4px;
+    }
   </style>
 </head>
 <body>
@@ -388,6 +410,19 @@
               <div class="cueMeta" id="engine-latency">Latency 18ms • No drops</div>
               <div class="cueMeta" id="engine-sync">Sync: 2 nodes online</div>
               <div class="cueMeta" id="engine-save">Showfile autosave 10:24:58</div>
+            </div>
+
+            <div class="runNotes cue">
+              <div class="cueRow">
+                <span class="cueId">RUN NOTES</span>
+                <span class="meta">Operator</span>
+              </div>
+              <textarea id="global-notes" placeholder="Global run-of-show notes..."></textarea>
+              <button class="ghost" id="save-global-notes" type="button">Save Global Notes</button>
+              <input id="quick-note-text" placeholder="Quick note for active cue..." />
+              <button class="ghost" id="add-quick-note" type="button">Add Cue Note</button>
+              <div class="cueMeta">Status Feed</div>
+              <div id="run-status-log" class="statusLog"></div>
             </div>
           </div>
         </aside>

@@ -3,6 +3,7 @@ import { createCueState } from "./cueState.mjs";
 import { getTransportCommandForKeyEvent } from "./hotkeys.mjs";
 import { parseShowfileText } from "./showfileLoader.mjs";
 import { createImportedAssetRecord } from "./assetImport.mjs";
+import { createRunStatusFeed } from "./runStatus.mjs";
 import {
   EDITOR_CUE_TYPES,
   createCueDraft,
@@ -31,11 +32,18 @@ const editorDeleteButton = document.getElementById("editor-delete");
 const editorImportAssetButton = document.getElementById("editor-import-asset");
 const assetFileInput = document.getElementById("asset-file-input");
 const exportButton = document.getElementById("export-showfile");
+const globalNotesInput = document.getElementById("global-notes");
+const saveGlobalNotesButton = document.getElementById("save-global-notes");
+const quickNoteInput = document.getElementById("quick-note-text");
+const addQuickNoteButton = document.getElementById("add-quick-note");
+const runStatusLog = document.getElementById("run-status-log");
 
 let currentShowTitle = "ACME_2026_Q1.oshow";
 let currentOutputCount = 2;
 let currentCues = cues;
 let cueState = createCueState(currentCues, 1);
+let globalNotesText = "";
+const runStatusFeed = createRunStatusFeed();
 
 for (const type of EDITOR_CUE_TYPES) {
   const option = document.createElement("option");
@@ -58,6 +66,10 @@ function createShowfileExport() {
         { id: "out-program-1", name: "Program", role: "program", enabled: true },
         { id: "out-confidence-1", name: "Confidence", role: "confidence", enabled: true }
       ],
+      runNotes: {
+        global: globalNotesText,
+        statusEvents: runStatusFeed.list()
+      },
       cues: currentCues.map((cue) => {
         const cueRecord = {
           id: cue.id,
@@ -80,6 +92,32 @@ function createShowfileExport() {
     null,
     2
   );
+}
+
+function formatLogTime(isoString) {
+  return new Date(isoString).toLocaleTimeString([], {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+function renderRunStatusLog() {
+  const entries = runStatusFeed.list();
+  runStatusLog.innerHTML = "";
+  for (const entry of entries) {
+    const item = document.createElement("div");
+    item.className = "cueMeta";
+    item.textContent = `[${formatLogTime(entry.timestamp)}] ${entry.message}`;
+    runStatusLog.appendChild(item);
+  }
+}
+
+function pushStatus(message, level = "info") {
+  statusLabel.textContent = message;
+  runStatusFeed.add(message, level);
+  renderRunStatusLog();
 }
 
 function syncPills() {
@@ -157,28 +195,52 @@ function applySnapshot(snapshot) {
   inspectorTransitions.innerHTML = cue.transitions.join("<br />");
   inspectorNotes.textContent = cue.notes;
   inspectorSafety.innerHTML = cue.safety.join("<br />");
-  statusLabel.textContent = snapshot.status;
   setEditorFromCue(cue);
   renderCueList(snapshot);
+}
+
+function appendCueNote(cueId, noteText) {
+  const timestamp = new Date().toLocaleTimeString([], {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+  currentCues = currentCues.map((cue) => {
+    if (cue.id !== cueId) {
+      return cue;
+    }
+    return {
+      ...cue,
+      notes: `${cue.notes}\n[${timestamp}] ${noteText}`
+    };
+  });
 }
 
 function replaceCueState(nextCues, activeIndex = 0, status = "Ready") {
   currentCues = nextCues;
   cueState = createCueState(currentCues, activeIndex);
   const snapshot = cueState.getSnapshot();
-  applySnapshot({ ...snapshot, status });
+  applySnapshot(snapshot);
+  pushStatus(status);
 }
 
 function goNext() {
-  applySnapshot(cueState.goNext());
+  const snapshot = cueState.goNext();
+  applySnapshot(snapshot);
+  pushStatus(`GO ${snapshot.activeCue.id}`);
 }
 
 function goBack() {
-  applySnapshot(cueState.goBack());
+  const snapshot = cueState.goBack();
+  applySnapshot(snapshot);
+  pushStatus(`BACK ${snapshot.activeCue.id}`);
 }
 
 function skipCue() {
-  applySnapshot(cueState.skipCue());
+  const snapshot = cueState.skipCue();
+  applySnapshot(snapshot);
+  pushStatus(`SKIP ${snapshot.activeCue.id}`);
 }
 
 function setLoadedShowfile(viewModel) {
@@ -212,7 +274,7 @@ showfileInput.addEventListener("change", async (event) => {
     const viewModel = parseShowfileText(text);
     setLoadedShowfile(viewModel);
   } catch (error) {
-    statusLabel.textContent = `Import failed: ${error.message}`;
+    pushStatus(`Import failed: ${error.message}`, "error");
   } finally {
     showfileInput.value = "";
   }
@@ -225,7 +287,7 @@ editorForm.addEventListener("submit", (event) => {
     const next = upsertCue(currentCues, cue);
     replaceCueState(next.cues, next.activeIndex, "Cue saved");
   } catch (error) {
-    statusLabel.textContent = `Save failed: ${error.message}`;
+    pushStatus(`Save failed: ${error.message}`, "error");
   }
 });
 
@@ -233,7 +295,7 @@ editorNewButton.addEventListener("click", (event) => {
   event.preventDefault();
   const draft = createCueDraft(currentCues);
   setEditorFromDraft(draft);
-  statusLabel.textContent = "New cue draft ready";
+  pushStatus("New cue draft ready");
 });
 
 editorDeleteButton.addEventListener("click", (event) => {
@@ -243,7 +305,7 @@ editorDeleteButton.addEventListener("click", (event) => {
     const next = deleteCueById(currentCues, cueId);
     replaceCueState(next.cues, next.activeIndex, "Cue deleted");
   } catch (error) {
-    statusLabel.textContent = `Delete failed: ${error.message}`;
+    pushStatus(`Delete failed: ${error.message}`, "error");
   }
 });
 
@@ -265,12 +327,32 @@ assetFileInput.addEventListener("change", (event) => {
     if (!editorForm.elements.preview.value) {
       editorForm.elements.preview.value = file.name;
     }
-    statusLabel.textContent = `Asset linked: ${file.name}`;
+    pushStatus(`Asset linked: ${file.name}`);
   } catch (error) {
-    statusLabel.textContent = `Asset import failed: ${error.message}`;
+    pushStatus(`Asset import failed: ${error.message}`, "error");
   } finally {
     assetFileInput.value = "";
   }
+});
+
+saveGlobalNotesButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  globalNotesText = globalNotesInput.value.trim();
+  pushStatus("Global run notes saved");
+});
+
+addQuickNoteButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  const noteText = quickNoteInput.value.trim();
+  if (!noteText) {
+    return;
+  }
+
+  const activeCueId = cueState.getSnapshot().activeCue.id;
+  appendCueNote(activeCueId, noteText);
+  applySnapshot(cueState.getSnapshot());
+  quickNoteInput.value = "";
+  pushStatus(`Cue note added to ${activeCueId}`);
 });
 
 exportButton.addEventListener("click", (event) => {
@@ -284,7 +366,7 @@ exportButton.addEventListener("click", (event) => {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-  statusLabel.textContent = "Exported edited-showfile.json";
+  pushStatus("Exported edited-showfile.json");
 });
 
 window.addEventListener("keydown", (event) => {
@@ -305,3 +387,4 @@ window.addEventListener("keydown", (event) => {
 
 syncPills();
 applySnapshot(cueState.getSnapshot());
+pushStatus("Session ready");

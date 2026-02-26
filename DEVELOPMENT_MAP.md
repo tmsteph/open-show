@@ -32,7 +32,7 @@ Goal: run real rehearsals/shows for slide/video playback with cueing and operato
 Deliverables
 - [ ] Cue list CRUD (PPT/image/video/black/freeze cues).
 - [ ] Transport controls (GO/BACK/SKIP, hotkeys, panic actions).
-- [ ] Run-of-show notes and status panel.
+- [x] Run-of-show notes and status panel.
 - [ ] Multi-output mapping model (program/confidence/operator).
 - [ ] Health page (fps, drops, connected outputs).
 - [ ] Offline-first behavior for local show execution.
