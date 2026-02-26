@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0a1633" />
+  <title>OpenShow — Any Laptop Becomes FOH</title>
+  <meta name="description" content="OpenShow is an open-source, network-first audio/video/lighting control stack that lets any computer become front-of-house. Start with a laptop + common USB interfaces. Grow into fully network-native speakers, projectors, and stage endpoints." />
+  <style>
+    :root{
+      --bg0:#060b16;
+      --bg1:#0a1633;
+      --card:rgba(255,255,255,.06);
+      --card2:rgba(255,255,255,.085);
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.68);
+      --muted2:rgba(255,255,255,.55);
+      --line:rgba(255,255,255,.14);
+      --gold:#f6d36a;
+      --gold2:#ffea9a;
+      --blue:#6dd6ff;
+      --green:#8bffb0;
+      --red:#ff7a93;
+      --shadow: 0 12px 40px rgba(0,0,0,.35);
+      --shadow2: 0 10px 30px rgba(0,0,0,.28);
+      --radius: 20px;
+      --radius2: 14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 20% 0%, rgba(109,214,255,.18), transparent 60%),
+        radial-gradient(900px 600px at 90% 15%, rgba(246,211,106,.14), transparent 55%),
+        radial-gradient(900px 700px at 40% 110%, rgba(139,255,176,.10), transparent 50%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      min-height:100vh;
+      overflow-x:hidden;
+    }
+    a{color:inherit}
+    .wrap{max-width:1120px;margin:0 auto;padding:0 18px}
+    header{
+      position:sticky; top:0; z-index:20;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(180deg, rgba(6,11,22,.82), rgba(6,11,22,.40));
+      border-bottom:1px solid rgba(255,255,255,.08);
+    }
+    .nav{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 0;
+      gap:12px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      text-decoration:none;
+    }
+    .logo{
+      width:34px;height:34px;border-radius:10px;
+      background:
+        radial-gradient(12px 12px at 30% 30%, rgba(255,255,255,.65), transparent 60%),
+        radial-gradient(14px 14px at 70% 40%, rgba(246,211,106,.55), transparent 62%),
+        radial-gradient(18px 18px at 40% 70%, rgba(109,214,255,.45), transparent 60%),
+        linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.18);
+      box-shadow: 0 10px 26px rgba(0,0,0,.32);
+    }
+    .brand b{letter-spacing:.3px}
+    .pillrow{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end}
+    .pill{
+      font-size:12px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      color:var(--muted);
+      text-decoration:none;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .pill:hover{transform:translateY(-1px); background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.22)}
+    .pill.primary{
+      color:rgba(7,12,24,.95);
+      background: linear-gradient(135deg, var(--gold), var(--gold2));
+      border-color: rgba(255,255,255,.0);
+      box-shadow: 0 10px 26px rgba(246,211,106,.18);
+    }
+    .pill.primary:hover{transform:translateY(-2px)}
+    .hero{padding:56px 0 26px}
+    .gridHero{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:18px;
+      align-items:stretch;
+    }
+    @media (max-width: 920px){
+      .gridHero{grid-template-columns:1fr}
+      .pillrow{justify-content:flex-start}
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.12);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .heroCard{padding:22px 22px 18px; position:relative; overflow:hidden}
+    .heroCard:before{
+      content:"";
+      position:absolute; inset:-120px -120px auto auto;
+      width:260px; height:260px;
+      background: radial-gradient(circle at 30% 30%, rgba(109,214,255,.22), transparent 60%),
+                  radial-gradient(circle at 70% 50%, rgba(246,211,106,.18), transparent 65%);
+      transform: rotate(18deg);
+      filter: blur(1px);
+      pointer-events:none;
+    }
+    h1{
+      margin:0 0 10px;
+      font-size: clamp(28px, 4.2vw, 44px);
+      line-height:1.05;
+      letter-spacing:-.6px;
+    }
+    .sub{
+      margin:0 0 14px;
+      color:var(--muted);
+      font-size: clamp(14px, 1.6vw, 17px);
+      line-height:1.6;
+      max-width: 70ch;
+    }
+    .ctaRow{display:flex; flex-wrap:wrap; gap:10px; margin-top:10px}
+    .btn{
+      display:inline-flex; align-items:center; gap:10px;
+      padding:11px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      text-decoration:none;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+    }
+    .btn:hover{transform:translateY(-2px); background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.22)}
+    .btn.primary{
+      background: linear-gradient(135deg, rgba(109,214,255,.18), rgba(246,211,106,.20));
+      border-color: rgba(255,255,255,.18);
+    }
+    .btn .dot{
+      width:10px; height:10px; border-radius:999px;
+      background: var(--gold);
+      box-shadow: 0 0 0 6px rgba(246,211,106,.12);
+    }
+    .kpis{display:grid; gap:10px; padding:14px; border-radius: var(--radius); background: rgba(0,0,0,.16); border:1px solid rgba(255,255,255,.10)}
+    .kpi{display:flex; gap:10px; align-items:flex-start}
+    .kpi b{color:var(--gold)}
+    .kpi p{margin:0; color:var(--muted); font-size:13px; line-height:1.45}
+    .sideCard{padding:18px}
+    .sideTitle{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px}
+    .badge{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(139,255,176,.12);
+      border:1px solid rgba(139,255,176,.22);
+      color: rgba(200,255,220,.92);
+    }
+    .sideCard h3{margin:0; font-size:16px; letter-spacing:.2px}
+    .list{margin:10px 0 0; padding:0; list-style:none; display:grid; gap:10px}
+    .li{
+      padding:12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .li small{display:block; color:var(--muted2); margin-top:6px; line-height:1.45}
+    .tag{
+      font-family:var(--mono);
+      font-size:12px;
+      color: rgba(109,214,255,.95);
+    }
+    section{padding:22px 0}
+    .h2{
+      font-size:22px;
+      margin:0 0 10px;
+      letter-spacing:-.2px;
+    }
+    .muted{color:var(--muted); line-height:1.7; margin:0}
+    .cards{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:14px;
+      margin-top:14px;
+    }
+    @media (max-width: 960px){ .cards{grid-template-columns:1fr} }
+    .c{
+      padding:16px;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: var(--shadow2);
+    }
+    .c h4{margin:0 0 8px; font-size:16px}
+    .c p{margin:0; color:var(--muted); line-height:1.6; font-size:14px}
+    .c .mini{margin-top:10px; color:rgba(255,255,255,.62); font-size:12px; line-height:1.55}
+    .hr{
+      height:1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent);
+      margin:18px 0;
+    }
+    .two{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+    @media (max-width: 900px){ .two{grid-template-columns:1fr} }
+    .codebox{
+      background: rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius: var(--radius);
+      padding:14px;
+      overflow:auto;
+      font-family:var(--mono);
+      font-size:12px;
+      color: rgba(255,255,255,.78);
+      line-height:1.65;
+      margin-top:10px;
+      white-space:pre;
+    }
+    details{
+      border-radius: var(--radius);
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      padding:12px 12px;
+    }
+    summary{
+      cursor:pointer;
+      list-style:none;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      font-weight:650;
+    }
+    summary::-webkit-details-marker{display:none}
+    .chev{
+      width:10px;height:10px;border-right:2px solid rgba(255,255,255,.65); border-bottom:2px solid rgba(255,255,255,.65);
+      transform: rotate(-45deg);
+      transition: transform .15s ease;
+      margin-left:auto;
+    }
+    details[open] .chev{transform: rotate(45deg)}
+    footer{
+      padding:26px 0 36px;
+      color: rgba(255,255,255,.62);
+      font-size:12px;
+    }
+    .footgrid{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:10px;
+      align-items:center;
+    }
+    @media (max-width: 820px){ .footgrid{grid-template-columns:1fr} }
+    .spark{
+      display:inline-block;
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.72);
+      margin-left:6px;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="nav">
+        <a class="brand" href="#top" aria-label="OpenShow Home">
+          <div class="logo" aria-hidden="true"></div>
+          <div>
+            <b>OpenShow</b>
+            <span class="spark">3dvr.tech</span>
+          </div>
+        </a>
+        <div class="pillrow" role="navigation" aria-label="Page sections">
+          <a class="pill" href="#problem">Problem</a>
+          <a class="pill" href="#mvp">MVP</a>
+          <a class="pill" href="#architecture">Architecture</a>
+          <a class="pill" href="#roadmap">Roadmap</a>
+          <a class="pill primary" href="#get-involved">Get Involved</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <div class="wrap">
+      <section class="hero">
+        <div class="gridHero">
+          <div class="card heroCard">
+            <h1>Any computer becomes front-of-house.</h1>
+            <p class="sub">
+              OpenShow is an open-source, network-first control stack for <b>audio</b>, <b>video</b>, and <b>lighting</b>.
+              Start today with a laptop + common USB interfaces. Grow into a future where speakers, projectors, and fixtures
+              take <b>network in</b> and speak open protocols — no proprietary islands.
+            </p>
+
+            <div class="ctaRow">
+              <a class="btn primary" href="#mvp"><span class="dot" aria-hidden="true"></span><b>Define the MVP</b></a>
+              <a class="btn" href="#architecture">See the architecture</a>
+              <a class="btn" href="#roadmap">Roadmap & phases</a>
+            </div>
+
+            <div class="hr"></div>
+
+            <div class="kpis" aria-label="Project goals">
+              <div class="kpi">
+                <div class="tag">GOAL_01</div>
+                <p><b>Walk into corporate events</b> with one laptop and a few interfaces — replace the mixer, video switcher, and lighting controller over time.</p>
+              </div>
+              <div class="kpi">
+                <div class="tag">GOAL_02</div>
+                <p><b>Network-first future</b>: endpoints (speakers/projectors) become simple, reliable network devices with open-source firmware.</p>
+              </div>
+              <div class="kpi">
+                <div class="tag">GOAL_03</div>
+                <p><b>OS-agnostic</b>: run the UI in a browser; run the engine headless; work on Linux/Windows/macOS with the same showfile.</p>
+              </div>
+            </div>
+          </div>
+
+          <aside class="card sideCard">
+            <div class="sideTitle">
+              <h3>What we’re building first</h3>
+              <span class="badge">Corporate MVP</span>
+            </div>
+            <ul class="list">
+              <li class="li">
+                <div class="tag">MVP::PLAYBACK</div>
+                <small>
+                  Play PowerPoint and videos reliably, with a simple cue list, hotkeys, and notes.
+                  (Think: show-ready playback that doesn’t require “the big switcher.”)
+                </small>
+              </li>
+              <li class="li">
+                <div class="tag">MVP::OUTPUTS</div>
+                <small>
+                  Output to projectors/displays using common adapters (HDMI/USB-C), and support common capture/output cards as needed.
+                </small>
+              </li>
+              <li class="li">
+                <div class="tag">MVP::EXTEND</div>
+                <small>
+                  Add USB lighting + USB audio interfaces next, then graduate to fully networked endpoints.
+                </small>
+              </li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2 class="h2">The problem</h2>
+        <p class="muted">
+          Corporate events often require separate boxes for playback, switching, audio mixing, and lighting control — plus vendor-specific software
+          that only runs on one OS. The result: heavy kits, complex workflows, fragile handoffs, and expensive gear duplication.
+          OpenShow aims to unify control into a <b>portable</b>, <b>repeatable</b>, <b>open</b> system.
+        </p>
+
+        <div class="cards" style="margin-top:16px">
+          <div class="c">
+            <h4>Too many islands</h4>
+            <p>Audio, video, and lighting each have their own control worlds — and they rarely agree on standards.</p>
+            <div class="mini">OpenShow provides one showfile, one cue engine, many adapters.</div>
+          </div>
+          <div class="c">
+            <h4>OS lock-in</h4>
+            <p>Control apps are often Windows-only, forcing extra laptops and extra failure points.</p>
+            <div class="mini">OpenShow is browser-first + headless engine: OS becomes a detail.</div>
+          </div>
+          <div class="c">
+            <h4>Hard to scale</h4>
+            <p>When you need endpoints near stage or amps, “one laptop does it all” becomes fragile.</p>
+            <div class="mini">OpenShow uses edge nodes near outputs — FOH can be any client.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="mvp">
+        <h2 class="h2">MVP: Playback that replaces the “presentation stack”</h2>
+        <p class="muted">
+          The first deliverable is intentionally narrow and gig-realistic: <b>PowerPoint + video playback</b> with
+          a cue list and reliable output routing. This is the fastest way to ship something useful for corporate events
+          while building the foundation for audio + lighting control.
+        </p>
+
+        <div class="two">
+          <div class="c">
+            <h4>MVP features</h4>
+            <p>
+              • Cue list: PPT slides, videos, images, black/freeze<br/>
+              • Hotkeys + “GO / BACK” workflow<br/>
+              • Notes per cue + run-of-show view<br/>
+              • Output selection (projector / confidence / operator)<br/>
+              • Health page (FPS, dropped frames, device status)<br/>
+              • Simple “panic” actions (blackout, mute, stop)
+            </p>
+            <div class="mini">The MVP is designed to be used at shows immediately — even before audio/lighting are integrated.</div>
+          </div>
+
+          <div class="c">
+            <h4>Typical corporate kit</h4>
+            <p>
+              • 1 FOH laptop (browser UI)<br/>
+              • 1–2 USB video output / capture options (as needed)<br/>
+              • Optional: tiny stage mini-PC near projector/switcher rack<br/>
+              • Network switch + a clean control VLAN (recommended)
+            </p>
+            <div class="mini">Goal: walk in lighter, set up faster, and keep the system recoverable if a laptop dies.</div>
+          </div>
+        </div>
+
+        <details style="margin-top:14px">
+          <summary>
+            MVP scope boundaries (what we are NOT doing yet)
+            <span class="chev" aria-hidden="true"></span>
+          </summary>
+          <div style="margin-top:10px; color: var(--muted); line-height:1.7;">
+            • Not replacing a high-end live audio console on day one.<br/>
+            • Not doing full broadcast-grade switching immediately.<br/>
+            • Not transporting audio over the same system (Dante/AES67) in v1 — this is a control + playback foundation first.<br/>
+            • Not relying on proprietary cloud services to function at a gig (offline-first mindset).
+          </div>
+        </details>
+      </section>
+
+      <section id="architecture">
+        <h2 class="h2">Architecture: FOH clients + edge nodes</h2>
+        <p class="muted">
+          OpenShow is built like a modern control system: a headless engine coordinates devices and cues, while any computer can be the operator UI.
+          Mini-PCs near stage outputs run adapters for USB/serial/network gear. Over time, those adapters become fully network-native endpoints.
+        </p>
+
+        <div class="two">
+          <div class="c">
+            <h4>Control plane (headless engine)</h4>
+            <p>
+              • Device discovery (find nodes + gear automatically)<br/>
+              • Unified API (one model for many protocols)<br/>
+              • Cue engine (timestamped “apply at T”)<br/>
+              • Permissions + audit log<br/>
+              • Redundancy ready (leader election / failover)
+            </p>
+            <div class="mini">Runs on a dedicated mini-PC, or on any machine. UI clients connect via LAN.</div>
+          </div>
+          <div class="c">
+            <h4>Edge nodes (near outputs)</h4>
+            <p>
+              • USB audio interfaces (initially)<br/>
+              • USB DMX / lighting adapters (initially)<br/>
+              • Projector control (PJLink / RS-232 / HTTP)<br/>
+              • Local health monitoring and safe fallbacks<br/>
+              • Protocol bridges (OSC, MIDI, sACN, Art-Net)
+            </p>
+            <div class="mini">If FOH Wi-Fi hiccups, edge nodes keep last-known state and can fall back to safe scenes.</div>
+          </div>
+        </div>
+
+        <div class="codebox" aria-label="High level diagram">
+FOH Laptop (Browser UI)         Backup Laptop (Browser UI)
+          \                           /
+           \                         /
+            -----> Control Plane <-----
+                   (Headless Engine)
+                      |       |
+                      |       |
+              ---------       ---------
+             |                           |
+        Edge Node A                  Edge Node B
+   (near projectors)           (near amps / lighting)
+     - video out/control           - USB audio
+     - PJLink/RS-232               - USB DMX
+     - status telemetry            - sACN/Art-Net out
+</div>
+
+        <details style="margin-top:14px">
+          <summary>
+            “Network-first endpoints” vision (future hardware)
+            <span class="chev" aria-hidden="true"></span>
+          </summary>
+          <div style="margin-top:10px; color: var(--muted); line-height:1.7;">
+            Long-term, OpenShow becomes its own ecosystem of open devices:<br/><br/>
+            • Speakers/amps with network-in + open telemetry<br/>
+            • Projectors/displays that expose open control + diagnostics<br/>
+            • Fixtures/nodes that are standards-compliant and self-identifying<br/>
+            • Firmware and schematics that are open-source, repairable, and auditable<br/><br/>
+            The near-term bridge is common USB + Ethernet adapters — the long-term goal is “plug it into the switch and it shows up.”
+          </div>
+        </details>
+      </section>
+
+      <section id="roadmap">
+        <h2 class="h2">Roadmap</h2>
+        <p class="muted">
+          We’re building in phases that each produce real-world value for live events — especially corporate — while steadily moving toward a fully network-native, open hardware ecosystem.
+        </p>
+
+        <div class="cards">
+          <div class="c">
+            <h4>Phase 1 — Corporate Playback MVP</h4>
+            <p>
+              Browser UI + cue list. PowerPoint + video playback. Multi-output. Reliable hotkeys. Run-of-show and notes.
+            </p>
+            <div class="mini">This replaces the “presentation stack” first.</div>
+          </div>
+          <div class="c">
+            <h4>Phase 2 — Lighting Adapter Layer</h4>
+            <p>
+              USB DMX support + sACN/Art-Net output. Scenes/looks. Basic busking controls. Cue integration.
+            </p>
+            <div class="mini">This replaces entry-level lighting control workflows.</div>
+          </div>
+          <div class="c">
+            <h4>Phase 3 — Audio Control + Monitoring</h4>
+            <p>
+              USB audio routing and monitoring; integrate common control protocols (OSC/MIDI) and device telemetry.
+            </p>
+            <div class="mini">Control + visibility first; deep console replacement later (if ever).</div>
+          </div>
+          <div class="c">
+            <h4>Phase 4 — Edge Nodes + Redundancy</h4>
+            <p>
+              Harden the node agent, leader election, offline-first behaviors, automatic recovery, and support bundles.
+            </p>
+            <div class="mini">“Any computer can be FOH” becomes real.</div>
+          </div>
+          <div class="c">
+            <h4>Phase 5 — Network-native endpoints</h4>
+            <p>
+              Open speakers / projectors / nodes: network-in, open diagnostics, OTA updates with rollback, repairable design.
+            </p>
+            <div class="mini">The hardware becomes simple; the network becomes the backplane.</div>
+          </div>
+          <div class="c">
+            <h4>Phase 6 — Open ecosystem</h4>
+            <p>
+              Published protocols + SDK. Community drivers. Integrations. A marketplace of open modules.
+            </p>
+            <div class="mini">Shift the industry by making openness the easiest option.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="get-involved">
+        <h2 class="h2">Get involved</h2>
+        <p class="muted">
+          OpenShow is meant to be built in public. If you’re a systems tech, programmer, stagehand, designer, or manufacturer who wants open standards to win,
+          there’s a place for you here.
+        </p>
+
+        <div class="two">
+          <div class="c">
+            <h4>What we need first</h4>
+            <p>
+              • A clean product spec for the playback MVP<br/>
+              • A showfile format (JSON) that can be diffed and versioned<br/>
+              • A minimal node agent and discovery mechanism<br/>
+              • UI screens: Cue List, Outputs, Notes, System Health
+            </p>
+            <div class="mini">If it can run a corporate show without drama, it’s worth shipping.</div>
+          </div>
+
+          <div class="c">
+            <h4>Guiding principles</h4>
+            <p>
+              • Open-source by default<br/>
+              • Works offline (no cloud dependency at gigs)<br/>
+              • OS-agnostic UI (browser-first)<br/>
+              • Edge nodes near outputs for reliability<br/>
+              • Logs + diagnostics built-in<br/>
+              • Repairable hardware as the endgame
+            </p>
+            <div class="mini">The goal is “less gear, more certainty.”</div>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="c">
+          <h4>Project one-liner</h4>
+          <p style="margin:0; color:var(--muted); line-height:1.7;">
+            <b>OpenShow</b> turns any laptop into FOH, uses small edge nodes near stage outputs, starts with common USB interfaces,
+            and evolves into an open ecosystem of network-native speakers and projectors — so live production can finally be portable, reliable, and free.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        <div class="footgrid">
+          <div>
+            <b>OpenShow</b> — an open project by <b>3dvr.tech</b>.
+            <span class="spark">network-first</span>
+            <span class="spark">open-source</span>
+            <span class="spark">edge-nodes</span>
+            <span class="spark">corporate-ready</span>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end">
+            <a class="pill" href="#top">Back to top</a>
+            <a class="pill" href="#mvp">MVP</a>
+            <a class="pill" href="#architecture">Architecture</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </main>
+
+  <script>
+    // Tiny enhancement: highlight the active nav pill based on scroll position (no dependencies).
+    (function(){
+      const links = Array.from(document.querySelectorAll('header .pillrow a.pill')).filter(a => a.getAttribute('href')?.startsWith('#'));
+      const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+      function setActive(hash){
+        links.forEach(a => a.style.opacity = (a.getAttribute('href') === hash) ? '1' : '.78');
+      }
+      function onScroll(){
+        const y = window.scrollY + 120;
+        let active = '#top';
+        for(const s of sections){
+          if(s.offsetTop <= y) active = '#' + s.id;
+        }
+        setActive(active);
+      }
+      window.addEventListener('scroll', onScroll, {passive:true});
+      onScroll();
+    })();
+  </script>
+</body>
+</html>
