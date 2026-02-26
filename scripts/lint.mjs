@@ -22,6 +22,7 @@ const jsFiles = [
   "mvp/src/cues.mjs",
   "mvp/src/cueState.mjs",
   "mvp/src/hotkeys.mjs",
+  "mvp/src/apiUx.mjs",
   "mvp/src/assetImport.mjs",
   "mvp/src/showApiClient.mjs",
   "mvp/src/runStatus.mjs",
@@ -42,6 +43,7 @@ const jsFiles = [
   "tests/showfileEditor.test.mjs",
   "tests/assetImport.test.mjs",
   "tests/runStatus.test.mjs",
+  "tests/apiUx.test.mjs",
   "tests/showStore.test.mjs",
   "tests/apiServer.test.mjs",
   "tests/showApiClient.test.mjs"
