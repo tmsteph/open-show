@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "0.1.0",
+  "metadata": {
+    "showId": "acme-q1-2026",
+    "title": "ACME Q1 Town Hall",
+    "venue": "Ballroom A",
+    "eventDate": "2026-03-14",
+    "revision": 1,
+    "createdAt": "2026-02-26T13:00:00Z"
+  },
+  "outputs": [
+    {
+      "id": "out-program-1",
+      "name": "Projector Left",
+      "role": "program",
+      "connector": "HDMI",
+      "resolution": "1920x1080",
+      "refreshHz": 59.94,
+      "enabled": true
+    },
+    {
+      "id": "out-confidence-1",
+      "name": "Confidence Display",
+      "role": "confidence",
+      "connector": "USB-C",
+      "resolution": "1920x1080",
+      "refreshHz": 59.94,
+      "enabled": true
+    }
+  ],
+  "cues": [
+    {
+      "id": "Q-001",
+      "type": "VID",
+      "name": "Welcome Loop",
+      "meta": "Lobby video",
+      "preview": "WELCOME_LOOP",
+      "notes": "Loop while doors are open.",
+      "outputs": ["out-program-1", "out-confidence-1"],
+      "transitions": ["Fade in 0.8s", "Fade out 0.4s"],
+      "safety": ["Blackout on panic", "Replay safe"],
+      "asset": {
+        "uri": "assets/video/welcome-loop.mp4",
+        "durationMs": 34000
+      }
+    },
+    {
+      "id": "Q-002",
+      "type": "PPT",
+      "name": "Keynote Deck",
+      "meta": "Slide 1/54",
+      "preview": "KEYNOTE_DECK_SLIDE_1",
+      "notes": "Hold until presenter starts.",
+      "outputs": ["out-program-1", "out-confidence-1"],
+      "transitions": ["Cut", "Cut"],
+      "safety": ["Blackout on panic", "Replay safe"],
+      "asset": {
+        "uri": "assets/decks/keynote.pptx"
+      }
+    },
+    {
+      "id": "Q-003",
+      "type": "BLACK",
+      "name": "Panic Black",
+      "meta": "Immediate safe state",
+      "preview": "BLACK",
+      "notes": "Use only for emergency visual cut.",
+      "outputs": ["out-program-1"],
+      "transitions": ["Cut"],
+      "safety": ["Immediate blackout"]
+    }
+  ]
+}
