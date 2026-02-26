@@ -209,11 +209,13 @@
           </div>
         </div>
         <div class="status">
-          <span class="pill">Showfile: ACME_2026_Q1.oshow</span>
-          <span class="pill">Outputs: 2 online</span>
+          <span class="pill" id="showfile-pill">Showfile: ACME_2026_Q1.oshow</span>
+          <span class="pill" id="outputs-pill">Outputs: 2 online</span>
           <span class="pill">Engine: healthy</span>
         </div>
         <div class="actions">
+          <a class="btn" href="#" id="import-showfile">Import Showfile</a>
+          <input id="showfile-input" type="file" accept="application/json,.json" hidden />
           <a class="btn" href="#">Rehearsal</a>
           <a class="btn" href="#">Outputs</a>
           <a class="btn primary" href="#" id="top-go">GO</a>

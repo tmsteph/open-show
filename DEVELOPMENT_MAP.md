@@ -120,3 +120,4 @@ Use 2-week iterations with this rhythm:
 1. [x] Implement cue list CRUD in app state (`PPT`, `IMG`, `VID`, `BLACK`, `FREEZE`).
 2. [x] Add transport command handling (`GO`, `BACK`, `SKIP`) with deterministic tests.
 3. [x] Add operator hotkeys for transport actions in the MVP UI.
+4. [x] Add local showfile import in MVP UI to accelerate rehearsal testing with real content.

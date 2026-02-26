@@ -1,6 +1,7 @@
 import { cues } from "./cues.mjs";
 import { createCueState } from "./cueState.mjs";
 import { getTransportCommandForKeyEvent } from "./hotkeys.mjs";
+import { parseShowfileText } from "./showfileLoader.mjs";
 
 const cueList = document.getElementById("cue-list");
 const cueCount = document.getElementById("cue-count");
@@ -11,12 +12,17 @@ const inspectorTransitions = document.getElementById("inspector-transitions");
 const inspectorNotes = document.getElementById("inspector-notes");
 const inspectorSafety = document.getElementById("inspector-safety");
 const statusLabel = document.getElementById("status-label");
+const showfilePill = document.getElementById("showfile-pill");
+const outputsPill = document.getElementById("outputs-pill");
+const importButton = document.getElementById("import-showfile");
+const showfileInput = document.getElementById("showfile-input");
 
-const cueState = createCueState(cues, 1);
+let currentCues = cues;
+let cueState = createCueState(currentCues, 1);
 
 function renderCueList(snapshot) {
   cueList.innerHTML = "";
-  cues.forEach((cue, index) => {
+  currentCues.forEach((cue, index) => {
     const item = document.createElement("div");
     item.className = "cue" + (index === snapshot.activeIndex ? " active" : "");
     item.setAttribute("data-index", String(index));
@@ -58,12 +64,41 @@ function skipCue() {
   applySnapshot(cueState.skipCue());
 }
 
+function setLoadedShowfile(viewModel) {
+  currentCues = viewModel.cues;
+  cueState = createCueState(currentCues, 0);
+  showfilePill.textContent = `Showfile: ${viewModel.title}`;
+  outputsPill.textContent = `Outputs: ${viewModel.outputCount} online`;
+  applySnapshot(cueState.getSnapshot());
+}
+
 document.getElementById("btn-go").addEventListener("click", goNext);
 document.getElementById("btn-back").addEventListener("click", goBack);
 document.getElementById("btn-skip").addEventListener("click", skipCue);
 document.getElementById("top-go").addEventListener("click", (event) => {
   event.preventDefault();
   goNext();
+});
+importButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  showfileInput.click();
+});
+showfileInput.addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const viewModel = parseShowfileText(text);
+    setLoadedShowfile(viewModel);
+    statusLabel.textContent = "Showfile loaded";
+  } catch (error) {
+    statusLabel.textContent = `Import failed: ${error.message}`;
+  } finally {
+    showfileInput.value = "";
+  }
 });
 
 window.addEventListener("keydown", (event) => {
