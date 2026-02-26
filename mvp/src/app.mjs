@@ -53,6 +53,7 @@ let currentCues = cues;
 let cueState = createCueState(currentCues, 1);
 let globalNotesText = "";
 const runStatusFeed = createRunStatusFeed();
+const runtimeAssetByCueId = new Map();
 showIdInput.value = "edited-mvp-show";
 apiBaseInput.value = normalizeApiBase("");
 
@@ -149,6 +150,65 @@ function setApiStatus(isOnline) {
   apiStatusPill.style.color = isOnline ? "var(--mint)" : "var(--red)";
 }
 
+function renderProgramPreview(cue) {
+  const runtimeAsset = runtimeAssetByCueId.get(cue.id);
+  previewLabel.innerHTML = "";
+
+  if (!runtimeAsset) {
+    previewLabel.textContent = cue.preview;
+    return;
+  }
+
+  const mediaType = runtimeAsset.mimeType?.toLowerCase() ?? "";
+  const fileName = runtimeAsset.fileName?.toLowerCase() ?? "";
+  const isImage = mediaType.startsWith("image/") || cue.type === "IMG";
+  const isVideo = mediaType.startsWith("video/") || cue.type === "VID";
+  const isAudio = mediaType.startsWith("audio/") || cue.type === "AUDIO" || cue.type === "STINGER";
+  const isPdf = mediaType === "application/pdf" || fileName.endsWith(".pdf");
+
+  if (isImage) {
+    const image = document.createElement("img");
+    image.src = runtimeAsset.objectUrl;
+    image.alt = cue.name;
+    image.className = "previewAsset";
+    previewLabel.appendChild(image);
+    return;
+  }
+
+  if (isVideo) {
+    const video = document.createElement("video");
+    video.src = runtimeAsset.objectUrl;
+    video.className = "previewAsset";
+    video.controls = true;
+    video.playsInline = true;
+    previewLabel.appendChild(video);
+    return;
+  }
+
+  if (isAudio) {
+    const wrap = document.createElement("div");
+    wrap.className = "previewAudio";
+    wrap.textContent = runtimeAsset.fileName;
+    const audio = document.createElement("audio");
+    audio.src = runtimeAsset.objectUrl;
+    audio.controls = true;
+    wrap.appendChild(audio);
+    previewLabel.appendChild(wrap);
+    return;
+  }
+
+  if (isPdf) {
+    const frame = document.createElement("iframe");
+    frame.src = runtimeAsset.objectUrl;
+    frame.className = "previewAsset";
+    frame.title = cue.name;
+    previewLabel.appendChild(frame);
+    return;
+  }
+
+  previewLabel.textContent = cue.preview;
+}
+
 function readEditorDraft() {
   const formData = new FormData(editorForm);
   return {
@@ -213,7 +273,7 @@ function renderCueList(snapshot) {
 
 function applySnapshot(snapshot) {
   const cue = snapshot.activeCue;
-  previewLabel.textContent = cue.preview;
+  renderProgramPreview(cue);
   inspectorTitle.textContent = `Cue ${cue.id}`;
   inspectorOutputs.innerHTML = cue.outputs.join("<br />");
   inspectorTransitions.innerHTML = cue.transitions.join("<br />");
@@ -242,6 +302,15 @@ function appendCueNote(cueId, noteText) {
 }
 
 function replaceCueState(nextCues, activeIndex = 0, status = "Ready") {
+  const validCueIds = new Set(nextCues.map((cue) => cue.id));
+  for (const [cueId, runtimeAsset] of runtimeAssetByCueId.entries()) {
+    if (validCueIds.has(cueId)) {
+      continue;
+    }
+    URL.revokeObjectURL(runtimeAsset.objectUrl);
+    runtimeAssetByCueId.delete(cueId);
+  }
+
   currentCues = nextCues;
   cueState = createCueState(currentCues, activeIndex);
   const snapshot = cueState.getSnapshot();
@@ -310,7 +379,13 @@ showfileInput.addEventListener("change", async (event) => {
 editorForm.addEventListener("submit", (event) => {
   event.preventDefault();
   try {
+    const previousCueId = cueState.getSnapshot().activeCue.id;
     const cue = normalizeCueDraft(readEditorDraft());
+    if (previousCueId !== cue.id && runtimeAssetByCueId.has(previousCueId)) {
+      const runtimeAsset = runtimeAssetByCueId.get(previousCueId);
+      runtimeAssetByCueId.set(cue.id, runtimeAsset);
+      runtimeAssetByCueId.delete(previousCueId);
+    }
     const next = upsertCue(currentCues, cue);
     replaceCueState(next.cues, next.activeIndex, "Cue saved");
   } catch (error) {
@@ -329,6 +404,10 @@ editorDeleteButton.addEventListener("click", (event) => {
   event.preventDefault();
   try {
     const cueId = editorForm.elements.id.value;
+    if (runtimeAssetByCueId.has(cueId)) {
+      URL.revokeObjectURL(runtimeAssetByCueId.get(cueId).objectUrl);
+      runtimeAssetByCueId.delete(cueId);
+    }
     const next = deleteCueById(currentCues, cueId);
     replaceCueState(next.cues, next.activeIndex, "Cue deleted");
   } catch (error) {
@@ -349,11 +428,23 @@ assetFileInput.addEventListener("change", (event) => {
 
   try {
     const record = createImportedAssetRecord(file);
+    const cueId = String(editorForm.elements.id.value).trim();
+    if (cueId && runtimeAssetByCueId.has(cueId)) {
+      URL.revokeObjectURL(runtimeAssetByCueId.get(cueId).objectUrl);
+    }
+    if (cueId) {
+      runtimeAssetByCueId.set(cueId, {
+        objectUrl: URL.createObjectURL(file),
+        mimeType: file.type,
+        fileName: file.name
+      });
+    }
     editorForm.elements.assetUri.value = record.assetUri;
     editorForm.elements.type.value = record.suggestedType;
     if (!editorForm.elements.preview.value) {
       editorForm.elements.preview.value = file.name;
     }
+    applySnapshot(cueState.getSnapshot());
     pushStatus(`Asset linked: ${file.name}`);
   } catch (error) {
     pushStatus(`Asset import failed: ${error.message}`, "error");
