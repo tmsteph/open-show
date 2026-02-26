@@ -1,0 +1,16 @@
+{
+  "name": "open-show",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenShow browser-first playback MVP",
+  "scripts": {
+    "lint": "node scripts/lint.mjs",
+    "validate:showfile": "node scripts/validate-showfile.mjs fixtures/sample-showfile.json docs/showfile.schema.json",
+    "test": "node --test",
+    "check": "npm run lint && npm run validate:showfile && npm run test"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

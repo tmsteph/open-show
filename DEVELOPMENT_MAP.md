@@ -8,22 +8,23 @@ Build a production-ready, browser-first show control platform, starting with a c
 ## Current Baseline
 - [x] Vision/architecture/roadmap landing page exists in [`index.html`](/home/tmsteph/open-show/index.html).
 - [x] Interactive MVP UI mock exists in [`mvp/index.html`](/home/tmsteph/open-show/mvp/index.html).
-- [ ] No backend engine, showfile persistence, output control, or automated tests yet.
+- [ ] No backend engine, showfile persistence, or output control yet.
+- [x] Minimal automated tests now cover cue progression logic.
 
 ## Phase Plan
 ## Phase 0: Spec + Repo Foundation
 Goal: lock scope and create implementation skeleton.
 
 Deliverables
-- [ ] Product spec for Playback MVP (`docs/spec-playback-mvp.md`).
-- [ ] Showfile schema v0 (`docs/showfile.schema.json`).
+- [x] Product spec for Playback MVP (`docs/spec-playback-mvp.md`).
+- [x] Showfile schema v0 (`docs/showfile.schema.json`).
 - [ ] Repo structure for app, engine, and adapters.
-- [ ] Local dev workflow (`README` commands + scripts).
-- [ ] CI basics (lint + test on pull requests).
+- [x] Local dev workflow (`README` commands + scripts).
+- [x] CI basics (lint + test on pull requests).
 
 Exit Criteria
 - [ ] MVP scope is frozen for Phase 1.
-- [ ] At least one sample showfile validates against schema.
+- [x] At least one sample showfile validates against schema.
 
 ## Phase 1: Corporate Playback MVP
 Goal: run real rehearsals/shows for slide/video playback with cueing and operator notes.
@@ -109,9 +110,8 @@ Use 2-week iterations with this rhythm:
 4. Review: demo, capture failures, update this map.
 
 ## Immediate Next Sprint (Recommended)
-1. Create `docs/spec-playback-mvp.md` with explicit in/out scope.
-2. Define `docs/showfile.schema.json` and add sample showfile fixtures.
-3. Split current MVP demo into app shell + state model modules.
-4. Add a minimal test harness for cue progression logic.
-5. Document run commands and architecture notes in README.
-
+1. [x] Create `docs/spec-playback-mvp.md` with explicit in/out scope.
+2. [x] Define `docs/showfile.schema.json` and add sample showfile fixtures.
+3. [x] Split current MVP demo into app shell + state model modules.
+4. [x] Add a minimal test harness for cue progression logic.
+5. [x] Document run commands and architecture notes in README.
