@@ -32,6 +32,8 @@ const jsFiles = [
   "scripts/start-api.mjs",
   "scripts/validate-showfile.mjs",
   "api/health.js",
+  "api/assets/index.js",
+  "api/assets/[assetId].js",
   "api/shows/index.js",
   "api/shows/[showId].js",
   "tests/cueState.test.mjs",

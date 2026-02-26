@@ -5,7 +5,7 @@ import { parseShowfileText } from "./showfileLoader.mjs";
 import { parseShowfileObject } from "./showfileLoader.mjs";
 import { createImportedAssetRecord } from "./assetImport.mjs";
 import { createRunStatusFeed } from "./runStatus.mjs";
-import { loadShowFromApi, pingApiHealth, saveShowToApi } from "./showApiClient.mjs";
+import { loadShowFromApi, pingApiHealth, saveShowToApi, uploadAssetToApi } from "./showApiClient.mjs";
 import { formatApiError, normalizeApiBase } from "./apiUx.mjs";
 import {
   EDITOR_CUE_TYPES,
@@ -152,15 +152,17 @@ function setApiStatus(isOnline) {
 
 function renderProgramPreview(cue) {
   const runtimeAsset = runtimeAssetByCueId.get(cue.id);
+  const persistentAssetUri = cue.assetUri ?? "";
   previewLabel.innerHTML = "";
 
-  if (!runtimeAsset) {
+  if (!runtimeAsset && !persistentAssetUri) {
     previewLabel.textContent = cue.preview;
     return;
   }
 
-  const mediaType = runtimeAsset.mimeType?.toLowerCase() ?? "";
-  const fileName = runtimeAsset.fileName?.toLowerCase() ?? "";
+  const mediaType = runtimeAsset?.mimeType?.toLowerCase() ?? "";
+  const fileName = runtimeAsset?.fileName?.toLowerCase() ?? persistentAssetUri.toLowerCase();
+  const sourceUri = runtimeAsset?.objectUrl ?? persistentAssetUri;
   const isImage = mediaType.startsWith("image/") || cue.type === "IMG";
   const isVideo = mediaType.startsWith("video/") || cue.type === "VID";
   const isAudio = mediaType.startsWith("audio/") || cue.type === "AUDIO" || cue.type === "STINGER";
@@ -168,7 +170,7 @@ function renderProgramPreview(cue) {
 
   if (isImage) {
     const image = document.createElement("img");
-    image.src = runtimeAsset.objectUrl;
+    image.src = sourceUri;
     image.alt = cue.name;
     image.className = "previewAsset";
     previewLabel.appendChild(image);
@@ -177,7 +179,7 @@ function renderProgramPreview(cue) {
 
   if (isVideo) {
     const video = document.createElement("video");
-    video.src = runtimeAsset.objectUrl;
+    video.src = sourceUri;
     video.className = "previewAsset";
     video.controls = true;
     video.playsInline = true;
@@ -188,9 +190,9 @@ function renderProgramPreview(cue) {
   if (isAudio) {
     const wrap = document.createElement("div");
     wrap.className = "previewAudio";
-    wrap.textContent = runtimeAsset.fileName;
+    wrap.textContent = runtimeAsset?.fileName ?? cue.assetUri ?? cue.name;
     const audio = document.createElement("audio");
-    audio.src = runtimeAsset.objectUrl;
+    audio.src = sourceUri;
     audio.controls = true;
     wrap.appendChild(audio);
     previewLabel.appendChild(wrap);
@@ -199,7 +201,7 @@ function renderProgramPreview(cue) {
 
   if (isPdf) {
     const frame = document.createElement("iframe");
-    frame.src = runtimeAsset.objectUrl;
+    frame.src = sourceUri;
     frame.className = "previewAsset";
     frame.title = cue.name;
     previewLabel.appendChild(frame);
@@ -420,7 +422,7 @@ editorImportAssetButton.addEventListener("click", (event) => {
   assetFileInput.click();
 });
 
-assetFileInput.addEventListener("change", (event) => {
+assetFileInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) {
     return;
@@ -428,6 +430,29 @@ assetFileInput.addEventListener("change", (event) => {
 
   try {
     const record = createImportedAssetRecord(file);
+    let persistedAssetUri = record.assetUri;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let index = 0; index < bytes.length; index += 1) {
+        binary += String.fromCharCode(bytes[index]);
+      }
+      const assetUpload = await uploadAssetToApi(
+        {
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+          dataBase64: btoa(binary)
+        },
+        { apiBase: getApiBase() }
+      );
+      persistedAssetUri = assetUpload.uri ?? persistedAssetUri;
+      setApiStatus(true);
+    } catch (uploadError) {
+      setApiStatus(false);
+      pushStatus(formatApiError("Asset upload", uploadError, getApiBase()), "error");
+    }
+
     const cueId = String(editorForm.elements.id.value).trim();
     if (cueId && runtimeAssetByCueId.has(cueId)) {
       URL.revokeObjectURL(runtimeAssetByCueId.get(cueId).objectUrl);
@@ -439,7 +464,7 @@ assetFileInput.addEventListener("change", (event) => {
         fileName: file.name
       });
     }
-    editorForm.elements.assetUri.value = record.assetUri;
+    editorForm.elements.assetUri.value = persistedAssetUri;
     editorForm.elements.type.value = record.suggestedType;
     if (!editorForm.elements.preview.value) {
       editorForm.elements.preview.value = file.name;
@@ -447,7 +472,7 @@ assetFileInput.addEventListener("change", (event) => {
     applySnapshot(cueState.getSnapshot());
     pushStatus(`Asset linked: ${file.name}`);
   } catch (error) {
-    pushStatus(`Asset import failed: ${error.message}`, "error");
+    pushStatus(formatApiError("Asset import", error, getApiBase()), "error");
   } finally {
     assetFileInput.value = "";
   }

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import http from "node:http";
 import { URL } from "node:url";
 
@@ -9,6 +10,16 @@ function sendJson(response, statusCode, body) {
     "access-control-allow-headers": "content-type"
   });
   response.end(`${JSON.stringify(body)}\n`);
+}
+
+function sendBinary(response, statusCode, buffer, contentType) {
+  response.writeHead(statusCode, {
+    "content-type": contentType,
+    "content-length": String(buffer.length),
+    "cache-control": "public, max-age=31536000, immutable",
+    "access-control-allow-origin": "*"
+  });
+  response.end(buffer);
 }
 
 async function readJsonBody(request) {
@@ -34,6 +45,11 @@ function getShowIdFromPath(pathname) {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+function getAssetIdFromPath(pathname) {
+  const match = /^\/api\/assets\/([^/]+)$/.exec(pathname);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export function createApiServer({ store }) {
   if (!store) {
     throw new Error("store is required");
@@ -51,6 +67,34 @@ export function createApiServer({ store }) {
 
       if (method === "GET" && url.pathname === "/api/health") {
         sendJson(response, 200, { status: "ok" });
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/api/assets") {
+        const body = await readJsonBody(request);
+        const assetId = body?.assetId ?? randomUUID();
+        const asset = await store.upsertAsset(assetId, body);
+        sendJson(response, 201, {
+          asset: {
+            assetId: asset.assetId,
+            fileName: asset.fileName,
+            contentType: asset.contentType,
+            sizeBytes: asset.sizeBytes,
+            uri: `/api/assets/${encodeURIComponent(asset.assetId)}`
+          }
+        });
+        return;
+      }
+
+      const assetId = getAssetIdFromPath(url.pathname);
+      if (method === "GET" && assetId) {
+        const asset = await store.getAsset(assetId);
+        if (!asset) {
+          sendJson(response, 404, { error: "Asset not found" });
+          return;
+        }
+        const binary = Buffer.from(asset.dataBase64, "base64");
+        sendBinary(response, 200, binary, asset.contentType || "application/octet-stream");
         return;
       }
 

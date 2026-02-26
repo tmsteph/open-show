@@ -6,17 +6,17 @@ function nowIso() {
 }
 
 function defaultDb() {
-  return { shows: [] };
+  return { shows: [], assets: [] };
 }
 
 function parseDb(input) {
   if (!input || typeof input !== "object") {
     return defaultDb();
   }
-  if (!Array.isArray(input.shows)) {
-    return defaultDb();
-  }
-  return { shows: input.shows };
+
+  const shows = Array.isArray(input.shows) ? input.shows : [];
+  const assets = Array.isArray(input.assets) ? input.assets : [];
+  return { shows, assets };
 }
 
 function toSummary(show) {
@@ -45,6 +45,32 @@ function normalizeIncomingShow(showId, payload) {
     revision: Number(payload?.metadata?.revision ?? 1),
     updatedAt: nowIso(),
     showfile: payload
+  };
+}
+
+function normalizeIncomingAsset(assetId, payload) {
+  const resolvedAssetId = String(assetId ?? "").trim();
+  const fileName = String(payload?.fileName ?? "").trim();
+  const contentType = String(payload?.contentType ?? "application/octet-stream").trim();
+  const dataBase64 = String(payload?.dataBase64 ?? "").trim();
+
+  if (!resolvedAssetId) {
+    throw new Error("assetId is required");
+  }
+  if (!fileName) {
+    throw new Error("fileName is required");
+  }
+  if (!dataBase64) {
+    throw new Error("dataBase64 is required");
+  }
+
+  return {
+    assetId: resolvedAssetId,
+    fileName,
+    contentType,
+    dataBase64,
+    sizeBytes: Buffer.from(dataBase64, "base64").length,
+    updatedAt: nowIso()
   };
 }
 
@@ -103,6 +129,24 @@ export function createShowStore(dbFilePath) {
         await writeDb(db);
       }
       return deleted;
+    },
+
+    async upsertAsset(assetId, payload) {
+      const db = await readDb();
+      const normalized = normalizeIncomingAsset(assetId, payload);
+      const index = db.assets.findIndex((asset) => asset.assetId === normalized.assetId);
+      if (index === -1) {
+        db.assets.push(normalized);
+      } else {
+        db.assets[index] = normalized;
+      }
+      await writeDb(db);
+      return normalized;
+    },
+
+    async getAsset(assetId) {
+      const db = await readDb();
+      return db.assets.find((asset) => asset.assetId === assetId) ?? null;
     }
   };
 }

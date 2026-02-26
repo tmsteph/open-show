@@ -43,3 +43,19 @@ test("show store deletes records", async () => {
   assert.equal(deleted, true);
   assert.equal(missing, null);
 });
+
+test("show store upserts and retrieves assets", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "openshow-store-"));
+  const store = createShowStore(path.join(dir, "shows.db.json"));
+
+  await store.upsertAsset("asset-1", {
+    fileName: "slide.png",
+    contentType: "image/png",
+    dataBase64: Buffer.from("img-bytes").toString("base64")
+  });
+
+  const asset = await store.getAsset("asset-1");
+  assert.equal(asset.assetId, "asset-1");
+  assert.equal(asset.fileName, "slide.png");
+  assert.equal(asset.contentType, "image/png");
+});

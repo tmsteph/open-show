@@ -31,8 +31,34 @@ function normalizeIncomingShow(showId, payload) {
   };
 }
 
+function normalizeIncomingAsset(assetId, payload) {
+  const resolvedAssetId = String(assetId ?? "").trim();
+  const fileName = String(payload?.fileName ?? "").trim();
+  const contentType = String(payload?.contentType ?? "application/octet-stream").trim();
+  const dataBase64 = String(payload?.dataBase64 ?? "").trim();
+
+  if (!resolvedAssetId) {
+    throw new Error("assetId is required");
+  }
+  if (!fileName) {
+    throw new Error("fileName is required");
+  }
+  if (!dataBase64) {
+    throw new Error("dataBase64 is required");
+  }
+
+  return {
+    assetId: resolvedAssetId,
+    fileName,
+    contentType,
+    dataBase64,
+    sizeBytes: Buffer.from(dataBase64, "base64").length,
+    updatedAt: nowIso()
+  };
+}
+
 export function createMemoryShowStore() {
-  const db = { shows: [] };
+  const db = { shows: [], assets: [] };
 
   return {
     async listShows() {
@@ -58,6 +84,21 @@ export function createMemoryShowStore() {
       const initialLength = db.shows.length;
       db.shows = db.shows.filter((show) => show.showId !== showId);
       return db.shows.length !== initialLength;
+    },
+
+    async upsertAsset(assetId, payload) {
+      const normalized = normalizeIncomingAsset(assetId, payload);
+      const index = db.assets.findIndex((asset) => asset.assetId === normalized.assetId);
+      if (index === -1) {
+        db.assets.push(normalized);
+      } else {
+        db.assets[index] = normalized;
+      }
+      return normalized;
+    },
+
+    async getAsset(assetId) {
+      return db.assets.find((asset) => asset.assetId === assetId) ?? null;
     }
   };
 }
