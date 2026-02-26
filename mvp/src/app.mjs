@@ -54,7 +54,7 @@ let cueState = createCueState(currentCues, 1);
 let globalNotesText = "";
 const runStatusFeed = createRunStatusFeed();
 showIdInput.value = "edited-mvp-show";
-apiBaseInput.value = "http://localhost:4173";
+apiBaseInput.value = normalizeApiBase("");
 
 for (const type of EDITOR_CUE_TYPES) {
   const option = document.createElement("option");
@@ -438,9 +438,9 @@ loadFromDbButton.addEventListener("click", async (event) => {
 testApiButton.addEventListener("click", async (event) => {
   event.preventDefault();
   try {
-    await pingApiHealth({ apiBase: getApiBase() });
+    const health = await pingApiHealth({ apiBase: getApiBase() });
     setApiStatus(true);
-    pushStatus(`API online at ${getApiBase()}`);
+    pushStatus(`API online (${health.storageMode ?? "runtime"} storage)`);
   } catch (error) {
     setApiStatus(false);
     pushStatus(formatApiError("API check", error, getApiBase()), "error");

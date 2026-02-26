@@ -12,6 +12,8 @@ const jsonFiles = [
 const jsFiles = [
   "src/app/playbackSession.mjs",
   "src/server/showStore.mjs",
+  "src/server/memoryShowStore.mjs",
+  "src/server/runtimeShowStore.mjs",
   "src/server/apiServer.mjs",
   "src/engine/cueState.mjs",
   "src/engine/showfileRuntime.mjs",
@@ -29,6 +31,9 @@ const jsFiles = [
   "scripts/lint.mjs",
   "scripts/start-api.mjs",
   "scripts/validate-showfile.mjs",
+  "api/health.js",
+  "api/shows/index.js",
+  "api/shows/[showId].js",
   "tests/cueState.test.mjs",
   "tests/hotkeys.test.mjs",
   "tests/showfileRuntime.test.mjs",
@@ -40,7 +45,8 @@ const jsFiles = [
   "tests/runStatus.test.mjs",
   "tests/apiUx.test.mjs",
   "tests/showStore.test.mjs",
-  "tests/apiServer.test.mjs"
+  "tests/apiServer.test.mjs",
+  "tests/showApiClient.test.mjs"
 ];
 
 async function main() {

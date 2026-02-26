@@ -1,10 +1,29 @@
 import { buildHealthEndpoint, buildShowsEndpoint, normalizeApiBase } from "./apiUx.mjs";
 
-function defaultApiBase() {
-  if (typeof globalThis !== "undefined" && typeof globalThis.OPENSHOW_API_BASE === "string") {
-    return globalThis.OPENSHOW_API_BASE;
+export function resolveDefaultApiBase(runtime = globalThis) {
+  if (typeof runtime !== "undefined" && typeof runtime.OPENSHOW_API_BASE === "string") {
+    return runtime.OPENSHOW_API_BASE;
+  }
+  if (
+    typeof runtime !== "undefined" &&
+    runtime.location &&
+    typeof runtime.location.origin === "string" &&
+    runtime.location.origin.startsWith("http")
+  ) {
+    return runtime.location.origin;
   }
   return "http://localhost:4173";
+}
+
+function defaultApiBase() {
+  return resolveDefaultApiBase();
+}
+
+export function formatFetchFailure(action, error, endpointBase = buildShowsEndpoint(defaultApiBase())) {
+  if (error?.name === "TypeError" || error?.message === "Failed to fetch") {
+    return `${action} failed: cannot reach API at ${endpointBase}`;
+  }
+  return `${action} failed: ${error.message ?? error}`;
 }
 
 export async function saveShowToApi(showfile, options = {}) {
@@ -44,6 +63,7 @@ export async function pingApiHealth(options = {}) {
   }
   return {
     status: "ok",
-    apiBase: normalizeApiBase(options.apiBase ?? defaultApiBase())
+    apiBase: normalizeApiBase(options.apiBase ?? defaultApiBase()),
+    storageMode: body.storageMode
   };
 }

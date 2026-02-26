@@ -1,8 +1,17 @@
 const DEFAULT_API_BASE = "http://localhost:4173";
 
+function browserOriginBase() {
+  if (typeof globalThis !== "undefined" && globalThis.location && typeof globalThis.location.origin === "string") {
+    if (globalThis.location.origin.startsWith("http")) {
+      return globalThis.location.origin;
+    }
+  }
+  return "";
+}
+
 export function normalizeApiBase(input) {
   const trimmed = String(input ?? "").trim().replace(/\/+$/, "");
-  return trimmed || DEFAULT_API_BASE;
+  return trimmed || browserOriginBase() || DEFAULT_API_BASE;
 }
 
 export function buildShowsEndpoint(apiBaseInput) {
