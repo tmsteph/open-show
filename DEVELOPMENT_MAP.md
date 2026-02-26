@@ -18,7 +18,7 @@ Goal: lock scope and create implementation skeleton.
 Deliverables
 - [x] Product spec for Playback MVP (`docs/spec-playback-mvp.md`).
 - [x] Showfile schema v0 (`docs/showfile.schema.json`).
-- [ ] Repo structure for app, engine, and adapters.
+- [x] Repo structure for app, engine, and adapters.
 - [x] Local dev workflow (`README` commands + scripts).
 - [x] CI basics (lint + test on pull requests).
 

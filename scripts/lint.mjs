@@ -10,12 +10,18 @@ const jsonFiles = [
 ];
 
 const jsFiles = [
+  "src/app/playbackSession.mjs",
+  "src/engine/cueState.mjs",
+  "src/engine/showfileRuntime.mjs",
+  "src/adapters/output/nullOutputAdapter.mjs",
   "mvp/src/app.mjs",
   "mvp/src/cues.mjs",
   "mvp/src/cueState.mjs",
   "scripts/lint.mjs",
   "scripts/validate-showfile.mjs",
-  "tests/cueState.test.mjs"
+  "tests/cueState.test.mjs",
+  "tests/showfileRuntime.test.mjs",
+  "tests/playbackSession.test.mjs"
 ];
 
 async function main() {
