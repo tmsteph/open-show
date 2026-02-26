@@ -36,3 +36,27 @@ test("createPlaybackSession activates cue transitions through adapter", async ()
   assert.equal(snapshot.activeCue.id, "Q-002");
   assert.equal(snapshot.status, "Skipped");
 });
+
+test("runTransportCommand executes GO/BACK/SKIP deterministically", async () => {
+  const activatedCueIds = [];
+  const outputAdapter = {
+    async activateCue(cue) {
+      activatedCueIds.push(cue.id);
+    }
+  };
+
+  const session = createPlaybackSession(showfile, { outputAdapter });
+
+  await session.runTransportCommand("GO");
+  await session.runTransportCommand("BACK");
+  const snapshot = await session.runTransportCommand("SKIP");
+
+  assert.deepEqual(activatedCueIds, ["Q-002", "Q-001", "Q-002"]);
+  assert.equal(snapshot.activeCue.id, "Q-002");
+  assert.equal(snapshot.status, "Skipped");
+});
+
+test("runTransportCommand rejects unsupported commands", async () => {
+  const session = createPlaybackSession(showfile);
+  await assert.rejects(() => session.runTransportCommand("PANIC"), /Unsupported transport command/);
+});

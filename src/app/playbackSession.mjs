@@ -31,6 +31,19 @@ export function createPlaybackSession(showfile, options = {}) {
     return snapshot;
   }
 
+  async function runTransportCommand(command) {
+    switch (command) {
+      case "GO":
+        return goNext();
+      case "BACK":
+        return goBack();
+      case "SKIP":
+        return skipCue();
+      default:
+        throw new Error(`Unsupported transport command: ${command}`);
+    }
+  }
+
   return {
     getRuntime() {
       return runtime;
@@ -41,6 +54,7 @@ export function createPlaybackSession(showfile, options = {}) {
     activateCurrentCue,
     goNext,
     goBack,
-    skipCue
+    skipCue,
+    runTransportCommand
   };
 }
