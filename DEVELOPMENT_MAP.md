@@ -129,6 +129,7 @@ Goal: support multi-session show storage and controlled asset ingestion without 
 
 Deliverables
 - [x] Minimal showfile database layer (create/read/update show metadata + cue payloads).
+- [x] Vercel preview compatibility for `/api` show persistence routes and browser same-origin API calls.
 - [ ] Operator authentication (single-tenant local accounts to start).
 - [ ] Asset upload API with server-managed storage paths and metadata.
 - [ ] Browser asset library panel wired to cue editor `asset.uri`.

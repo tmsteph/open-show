@@ -31,6 +31,14 @@ Available endpoints:
 
 The MVP UI now includes `Save to DB` and `Load from DB` actions that target `http://localhost:4173/api/shows` by default.
 
+## Vercel Previews
+- Serverless API routes are available at:
+  - `/api/health`
+  - `/api/shows`
+  - `/api/shows/:showId`
+- In browser previews, the MVP now defaults to same-origin API calls (for example `https://<preview>.vercel.app/api/shows`).
+- Storage on Vercel defaults to in-memory runtime storage unless you configure a persistent backend; data may reset on cold starts/redeploys.
+
 ## Development Map
 - Primary execution plan: [`DEVELOPMENT_MAP.md`](/home/tmsteph/open-show/DEVELOPMENT_MAP.md)
 - Current interactive MVP mock: [`mvp/index.html`](/home/tmsteph/open-show/mvp/index.html)
