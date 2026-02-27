@@ -14,6 +14,7 @@ Useful commands:
 - `npm test`: run cue progression tests.
 - `npm run check`: run lint + schema validation + tests.
 - `npm run start:api`: run local show persistence API (`http://localhost:4173`).
+- `npm run test:e2e:persistence`: run Playwright refresh-persistence regression flow.
 
 ## Local Persistence API
 Start the backend:

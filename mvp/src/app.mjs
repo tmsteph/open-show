@@ -77,6 +77,7 @@ let persistedAssets = [];
 let persistedShows = [];
 const SESSION_LAST_SHOW_ID_KEY = "openshow.lastShowId";
 const SESSION_API_BASE_KEY = "openshow.apiBase";
+const SESSION_LOCAL_SNAPSHOT_KEY = "openshow.localSnapshot";
 const AUTOSAVE_DELAY_MS = 2500;
 const AUTOSAVE_RETRY_MS = 10000;
 const browserStorage = (() => {
@@ -340,6 +341,125 @@ function readRememberedLastShowId() {
   return String(browserStorage.getItem(SESSION_LAST_SHOW_ID_KEY) ?? "").trim();
 }
 
+function readLocalSessionSnapshot() {
+  if (!browserStorage) {
+    return null;
+  }
+
+  const raw = browserStorage.getItem(SESSION_LOCAL_SNAPSHOT_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearLocalSessionSnapshot() {
+  if (!browserStorage) {
+    return;
+  }
+  browserStorage.removeItem(SESSION_LOCAL_SNAPSHOT_KEY);
+}
+
+function persistLocalSessionSnapshot(options = {}) {
+  if (!browserStorage) {
+    return;
+  }
+
+  try {
+    const showfile = createShowfileObject();
+    showfile.runNotes = {
+      ...(showfile.runNotes ?? {}),
+      global: String(globalNotesInput.value ?? "").trim()
+    };
+
+    const snapshot = cueState.getSnapshot();
+    const localSnapshot = {
+      schemaVersion: 1,
+      updatedAt: new Date().toISOString(),
+      hasUnsavedChanges: options.dirty === true,
+      showId: String(showIdInput.value ?? "").trim(),
+      showTitle: String(showTitleInput.value ?? "").trim(),
+      apiBase: String(apiBaseInput.value ?? "").trim(),
+      activeCueId: snapshot.activeCue?.id ?? "",
+      editorDraft: readEditorDraft(),
+      showfile
+    };
+
+    browserStorage.setItem(SESSION_LOCAL_SNAPSHOT_KEY, JSON.stringify(localSnapshot));
+  } catch {
+    // Ignore local snapshot persistence failures; API persistence still covers durability.
+  }
+}
+
+function restoreLocalSessionSnapshot(localSnapshot, options = {}) {
+  if (!localSnapshot || typeof localSnapshot !== "object" || !localSnapshot.showfile) {
+    return false;
+  }
+
+  try {
+    const viewModel = parseShowfileObject(localSnapshot.showfile);
+    setLoadedShowfile(viewModel);
+
+    const storedApiBase = String(localSnapshot.apiBase ?? "").trim();
+    if (storedApiBase) {
+      apiBaseInput.value = normalizeApiBase(storedApiBase);
+      rememberApiBase();
+    }
+
+    const storedShowId = String(localSnapshot.showId ?? viewModel.showId ?? "").trim();
+    if (storedShowId) {
+      showIdInput.value = storedShowId;
+      rememberLastShowId(storedShowId);
+    }
+
+    const storedActiveCueId = String(localSnapshot.activeCueId ?? "").trim();
+    if (storedActiveCueId) {
+      const activeIndex = currentCues.findIndex((cue) => cue.id === storedActiveCueId);
+      if (activeIndex >= 0) {
+        applySnapshot(cueState.setActive(activeIndex));
+      }
+    }
+
+    if (localSnapshot.editorDraft && typeof localSnapshot.editorDraft === "object") {
+      const currentDraft = readEditorDraft();
+      setEditorFromDraft({
+        id: String(localSnapshot.editorDraft.id ?? currentDraft.id ?? ""),
+        type: String(localSnapshot.editorDraft.type ?? currentDraft.type ?? "PPT"),
+        name: String(localSnapshot.editorDraft.name ?? currentDraft.name ?? ""),
+        meta: String(localSnapshot.editorDraft.meta ?? currentDraft.meta ?? ""),
+        preview: String(localSnapshot.editorDraft.preview ?? currentDraft.preview ?? ""),
+        outputsText: String(localSnapshot.editorDraft.outputsText ?? currentDraft.outputsText ?? ""),
+        transitionsText: String(localSnapshot.editorDraft.transitionsText ?? currentDraft.transitionsText ?? ""),
+        notes: String(localSnapshot.editorDraft.notes ?? currentDraft.notes ?? ""),
+        safetyText: String(localSnapshot.editorDraft.safetyText ?? currentDraft.safetyText ?? ""),
+        assetUri: String(localSnapshot.editorDraft.assetUri ?? currentDraft.assetUri ?? "")
+      });
+    }
+
+    if (localSnapshot.hasUnsavedChanges === true) {
+      hasUnsavedChanges = true;
+      if (!autosaveInFlight) {
+        setSaveState("dirty");
+      }
+      scheduleAutosave();
+    } else {
+      markSaved();
+    }
+
+    const statusMessage = options.statusMessage ?? "Restored local session snapshot";
+    pushStatus(statusMessage);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function syncGlobalNotesDraft() {
   globalNotesText = globalNotesInput.value.trim();
 }
@@ -355,6 +475,7 @@ function markSaved() {
   hasUnsavedChanges = false;
   clearAutosaveTimer();
   setSaveState("saved");
+  persistLocalSessionSnapshot({ dirty: false });
 }
 
 function scheduleAutosave(delayMs = AUTOSAVE_DELAY_MS) {
@@ -370,6 +491,7 @@ function markDirty() {
   if (!autosaveInFlight) {
     setSaveState("dirty");
   }
+  persistLocalSessionSnapshot({ dirty: true });
   scheduleAutosave();
 }
 
@@ -513,6 +635,7 @@ function renderShowLibrary() {
         if (showIdInput.value.trim() === show.showId) {
           showIdInput.value = "";
           rememberLastShowId("");
+          clearLocalSessionSnapshot();
         }
         await refreshShowLibrary({ silent: true });
         pushStatus(`Deleted show from DB: ${show.showId}`);
@@ -574,6 +697,13 @@ async function loadShowById(showId) {
 }
 
 async function restoreLastShowFromSession() {
+  const localSnapshot = readLocalSessionSnapshot();
+  if (localSnapshot?.hasUnsavedChanges === true) {
+    if (restoreLocalSessionSnapshot(localSnapshot, { statusMessage: "Restored unsaved local edits" })) {
+      return;
+    }
+  }
+
   const rememberedShowId = readRememberedLastShowId();
   if (!rememberedShowId) {
     return;
@@ -583,12 +713,17 @@ async function restoreLastShowFromSession() {
   try {
     await loadShowById(rememberedShowId);
   } catch (error) {
-    rememberLastShowId("");
-    showIdInput.value = "";
     const message = String(error?.message ?? "");
     if (/show not found/i.test(message)) {
+      if (restoreLocalSessionSnapshot(localSnapshot, { statusMessage: "Restored local session; server show was unavailable" })) {
+        return;
+      }
+      rememberLastShowId("");
+      showIdInput.value = "";
       return;
     }
+    rememberLastShowId("");
+    showIdInput.value = "";
     pushStatus(formatApiError("Session restore", error, getApiBase()), "error");
   }
 }
