@@ -587,7 +587,6 @@ async function restoreLastShowFromSession() {
     showIdInput.value = "";
     const message = String(error?.message ?? "");
     if (/show not found/i.test(message)) {
-      pushStatus("No saved session found for last show id. Use Show Library or save a new show.");
       return;
     }
     pushStatus(formatApiError("Session restore", error, getApiBase()), "error");
