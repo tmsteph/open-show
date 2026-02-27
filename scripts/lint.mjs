@@ -31,6 +31,7 @@ const jsFiles = [
   "mvp/src/showfileEditor.mjs",
   "scripts/lint.mjs",
   "scripts/start-api.mjs",
+  "scripts/playwright-refresh-persistence.mjs",
   "scripts/validate-showfile.mjs",
   "api/health.js",
   "api/assets/index.js",

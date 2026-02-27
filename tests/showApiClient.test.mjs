@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatFetchFailure, listAssetsFromApi, resolveDefaultApiBase } from "../mvp/src/showApiClient.mjs";
+import {
+  deleteShowFromApi,
+  formatFetchFailure,
+  listAssetsFromApi,
+  listShowsFromApi,
+  resolveDefaultApiBase
+} from "../mvp/src/showApiClient.mjs";
 
 test("resolveDefaultApiBase prefers browser origin", () => {
   const base = resolveDefaultApiBase({
@@ -61,6 +67,45 @@ test("listAssetsFromApi throws server error messages", async () => {
     await assert.rejects(
       listAssetsFromApi({ apiBase: "http://localhost:4173" }),
       /Asset list unavailable/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("listShowsFromApi returns show summaries", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return {
+        shows: [{ showId: "town-hall", title: "Town Hall", revision: 2, cueCount: 18 }]
+      };
+    }
+  });
+
+  try {
+    const shows = await listShowsFromApi({ apiBase: "http://localhost:4173" });
+    assert.equal(shows.length, 1);
+    assert.equal(shows[0].showId, "town-hall");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("deleteShowFromApi rejects API errors", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: false,
+    async json() {
+      return { error: "Show not found" };
+    }
+  });
+
+  try {
+    await assert.rejects(
+      deleteShowFromApi("missing-show", { apiBase: "http://localhost:4173" }),
+      /Show not found/
     );
   } finally {
     globalThis.fetch = originalFetch;

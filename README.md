@@ -14,6 +14,7 @@ Useful commands:
 - `npm test`: run cue progression tests.
 - `npm run check`: run lint + schema validation + tests.
 - `npm run start:api`: run local show persistence API (`http://localhost:4173`).
+- `npm run test:e2e:persistence`: run Playwright refresh-persistence regression flow.
 
 ## Local Persistence API
 Start the backend:
@@ -36,7 +37,7 @@ Available endpoints:
 - `POST /api/assets` (upload asset payloads)
 - `GET /api/assets/:assetId` (serve asset bytes)
 
-The MVP UI now includes `Save to DB` and `Load from DB` actions that target `http://localhost:4173/api/shows` by default.
+The MVP UI now includes `Save to DB` and `Load from DB` actions plus an in-app show library for loading/deleting saved shows.
 
 ## Vercel Previews
 - Serverless API routes are available at:

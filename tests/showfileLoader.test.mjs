@@ -4,9 +4,10 @@ import { parseShowfileText } from "../mvp/src/showfileLoader.mjs";
 
 test("parseShowfileText builds a cue view model from showfile JSON", () => {
   const input = JSON.stringify({
-    metadata: { title: "Town Hall" },
+    metadata: { showId: "town-hall", title: "Town Hall", revision: 3 },
+    runNotes: { global: "Keep podium mic live." },
     outputs: [
-      { id: "out-program", role: "program", name: "Projector Left" },
+      { id: "out-program", role: "program", name: "Projector Left", enabled: true },
       { id: "out-confidence", role: "confidence", name: "Confidence Display" }
     ],
     cues: [
@@ -22,8 +23,14 @@ test("parseShowfileText builds a cue view model from showfile JSON", () => {
   });
 
   const parsed = parseShowfileText(input);
+  assert.equal(parsed.showId, "town-hall");
   assert.equal(parsed.title, "Town Hall");
+  assert.equal(parsed.revision, 3);
+  assert.equal(parsed.runNotesGlobal, "Keep podium mic live.");
   assert.equal(parsed.outputCount, 2);
+  assert.equal(parsed.outputs.length, 2);
+  assert.equal(parsed.outputs[0].id, "out-program");
+  assert.equal(parsed.outputs[0].enabled, true);
   assert.equal(parsed.cues.length, 1);
   assert.deepEqual(parsed.cues[0].outputs, [
     "Program - Projector Left",

@@ -6,7 +6,9 @@ import { parseShowfileObject } from "./showfileLoader.mjs";
 import { createImportedAssetRecord, inferCueTypeForAsset } from "./assetImport.mjs";
 import { createRunStatusFeed } from "./runStatus.mjs";
 import {
+  deleteShowFromApi,
   listAssetsFromApi,
+  listShowsFromApi,
   loadShowFromApi,
   pingApiHealth,
   saveShowToApi,
@@ -32,6 +34,7 @@ const inspectorSafety = document.getElementById("inspector-safety");
 const statusLabel = document.getElementById("status-label");
 const showfilePill = document.getElementById("showfile-pill");
 const outputsPill = document.getElementById("outputs-pill");
+const saveStatePill = document.getElementById("save-state-pill");
 const apiStatusPill = document.getElementById("api-status-pill");
 const importButton = document.getElementById("import-showfile");
 const showfileInput = document.getElementById("showfile-input");
@@ -49,6 +52,9 @@ const loadFromDbButton = document.getElementById("load-from-db");
 const testApiButton = document.getElementById("test-api");
 const apiBaseInput = document.getElementById("api-base-input");
 const showIdInput = document.getElementById("show-id-input");
+const showTitleInput = document.getElementById("show-title-input");
+const showLibraryRefreshButton = document.getElementById("show-library-refresh");
+const showLibraryList = document.getElementById("show-library-list");
 const globalNotesInput = document.getElementById("global-notes");
 const saveGlobalNotesButton = document.getElementById("save-global-notes");
 const quickNoteInput = document.getElementById("quick-note-text");
@@ -57,14 +63,37 @@ const runStatusLog = document.getElementById("run-status-log");
 
 let currentShowTitle = "ACME_2026_Q1.oshow";
 let currentOutputCount = 2;
+let currentRevision = 1;
+let currentOutputs = [
+  { id: "out-program-1", name: "Output 1", role: "program", enabled: true },
+  { id: "out-confidence-2", name: "Output 2", role: "confidence", enabled: true }
+];
 let currentCues = cues;
 let cueState = createCueState(currentCues, 1);
 let globalNotesText = "";
 const runStatusFeed = createRunStatusFeed();
 const runtimeAssetByCueId = new Map();
 let persistedAssets = [];
+let persistedShows = [];
+const SESSION_LAST_SHOW_ID_KEY = "openshow.lastShowId";
+const SESSION_API_BASE_KEY = "openshow.apiBase";
+const SESSION_LOCAL_SNAPSHOT_KEY = "openshow.localSnapshot";
+const AUTOSAVE_DELAY_MS = 2500;
+const AUTOSAVE_RETRY_MS = 10000;
+const browserStorage = (() => {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+})();
+let hasUnsavedChanges = false;
+let autosaveTimerId = null;
+let autosaveInFlight = false;
+let lastAutosaveErrorAt = 0;
 showIdInput.value = "edited-mvp-show";
-apiBaseInput.value = normalizeApiBase("");
+showTitleInput.value = currentShowTitle;
+apiBaseInput.value = normalizeApiBase(browserStorage?.getItem(SESSION_API_BASE_KEY) ?? "");
 
 for (const type of EDITOR_CUE_TYPES) {
   const option = document.createElement("option");
@@ -73,50 +102,148 @@ for (const type of EDITOR_CUE_TYPES) {
   editorType.appendChild(option);
 }
 
-function createShowfileExport() {
-  return JSON.stringify(
-    {
-      schemaVersion: "0.1.0",
-      metadata: {
-        showId: "edited-mvp-show",
-        title: currentShowTitle,
-        revision: 1,
-        createdAt: new Date().toISOString()
-      },
-      outputs: [
-        { id: "out-program-1", name: "Program", role: "program", enabled: true },
-        { id: "out-confidence-1", name: "Confidence", role: "confidence", enabled: true }
-      ],
-      runNotes: {
-        global: globalNotesText,
-        statusEvents: runStatusFeed.list()
-      },
-      cues: currentCues.map((cue) => {
-        const cueRecord = {
-          id: cue.id,
-          type: cue.type,
-          name: cue.name,
-          meta: cue.meta,
-          preview: cue.preview,
-          notes: cue.notes,
-          outputs: ["out-program-1"],
-          transitions: cue.transitions,
-          safety: cue.safety
-        };
+function normalizeOutputRole(role) {
+  const normalized = String(role ?? "operator").trim().toLowerCase();
+  return ["program", "confidence", "operator"].includes(normalized) ? normalized : "operator";
+}
 
-        if (cue.assetUri) {
-          cueRecord.asset = { uri: cue.assetUri };
-        }
-        return cueRecord;
-      })
-    },
-    null,
-    2
-  );
+function formatOutputLabel(output) {
+  const roleTitle = output.role.charAt(0).toUpperCase() + output.role.slice(1);
+  return `${roleTitle} - ${output.name}`;
+}
+
+function inferRoleFromLabel(label) {
+  const normalized = String(label ?? "").trim().toLowerCase();
+  if (normalized.startsWith("program -")) {
+    return "program";
+  }
+  if (normalized.startsWith("confidence -")) {
+    return "confidence";
+  }
+  if (normalized.startsWith("operator -")) {
+    return "operator";
+  }
+  return "operator";
+}
+
+function normalizeOutputLabelKey(label) {
+  return String(label ?? "").trim().toLowerCase();
+}
+
+function toSlug(input) {
+  return String(input ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "output";
+}
+
+function buildUniqueOutputId(role, name, usedIds) {
+  const base = `out-${toSlug(role)}-${toSlug(name)}`;
+  if (!usedIds.has(base)) {
+    usedIds.add(base);
+    return base;
+  }
+
+  let suffix = 2;
+  while (usedIds.has(`${base}-${suffix}`)) {
+    suffix += 1;
+  }
+  const unique = `${base}-${suffix}`;
+  usedIds.add(unique);
+  return unique;
+}
+
+function buildOutputDefinitionState() {
+  const defaultOutputs = [{ id: "out-program-1", name: "Output 1", role: "program", enabled: true }];
+  const startingOutputs = currentOutputs.length > 0 ? currentOutputs : defaultOutputs;
+  const outputs = [];
+  const outputIdByLabel = new Map();
+  const usedIds = new Set();
+
+  for (const output of startingOutputs) {
+    const role = normalizeOutputRole(output.role);
+    const name = String(output.name ?? "Output").trim() || "Output";
+    const id = String(output.id ?? "").trim() || buildUniqueOutputId(role, name, usedIds);
+    usedIds.add(id);
+    const normalized = { id, name, role, enabled: output.enabled !== false };
+    outputs.push(normalized);
+    outputIdByLabel.set(normalizeOutputLabelKey(formatOutputLabel(normalized)), normalized.id);
+  }
+
+  for (const cue of currentCues) {
+    const labels = Array.isArray(cue.outputs) ? cue.outputs : [];
+    for (const rawLabel of labels) {
+      const label = String(rawLabel ?? "").trim();
+      const labelKey = normalizeOutputLabelKey(label);
+      if (!labelKey || outputIdByLabel.has(labelKey)) {
+        continue;
+      }
+      const role = inferRoleFromLabel(label);
+      const nameParts = label.split(" - ");
+      const name = nameParts.length > 1 ? nameParts.slice(1).join(" - ").trim() || "Output" : label;
+      const id = buildUniqueOutputId(role, name, usedIds);
+      const normalized = { id, name, role, enabled: true };
+      outputs.push(normalized);
+      outputIdByLabel.set(labelKey, normalized.id);
+    }
+  }
+
+  return { outputs, outputIdByLabel };
 }
 
 function createShowfileObject() {
-  return JSON.parse(createShowfileExport());
+  const showId = String(showIdInput.value ?? "").trim() || "edited-mvp-show";
+  const title = String(showTitleInput.value ?? "").trim() || "Untitled Show";
+  const { outputs, outputIdByLabel } = buildOutputDefinitionState();
+  const fallbackOutputId = outputs[0]?.id ?? "out-program-1";
+
+  return {
+    schemaVersion: "0.1.0",
+    metadata: {
+      showId,
+      title,
+      revision: Math.max(1, Number(currentRevision ?? 1)),
+      createdAt: new Date().toISOString()
+    },
+    outputs,
+    runNotes: {
+      global: globalNotesText,
+      statusEvents: runStatusFeed.list()
+    },
+    cues: currentCues.map((cue) => {
+      const cueOutputLabels = Array.isArray(cue.outputs)
+        ? cue.outputs.map((output) => String(output ?? "").trim()).filter(Boolean)
+        : [];
+      const cueOutputIds = cueOutputLabels
+        .map((label) => outputIdByLabel.get(normalizeOutputLabelKey(label)))
+        .filter(Boolean);
+
+      if (cueOutputIds.length === 0) {
+        cueOutputIds.push(fallbackOutputId);
+      }
+
+      const cueRecord = {
+        id: cue.id,
+        type: cue.type,
+        name: cue.name,
+        meta: cue.meta,
+        preview: cue.preview,
+        notes: cue.notes,
+        outputs: cueOutputIds,
+        transitions: cue.transitions,
+        safety: cue.safety
+      };
+
+      if (cue.assetUri) {
+        cueRecord.asset = { uri: cue.assetUri };
+      }
+      return cueRecord;
+    })
+  };
+}
+
+function createShowfileExport() {
+  return JSON.stringify(createShowfileObject(), null, 2);
 }
 
 function formatLogTime(isoString) {
@@ -159,6 +286,215 @@ function setApiStatus(isOnline) {
   apiStatusPill.style.color = isOnline ? "var(--mint)" : "var(--red)";
 }
 
+function setSaveState(mode) {
+  if (mode === "saved") {
+    saveStatePill.textContent = "Changes: saved";
+    saveStatePill.style.color = "var(--mint)";
+    return;
+  }
+
+  if (mode === "dirty") {
+    saveStatePill.textContent = "Changes: unsaved";
+    saveStatePill.style.color = "var(--accent2)";
+    return;
+  }
+
+  if (mode === "autosaving") {
+    saveStatePill.textContent = "Changes: autosaving";
+    saveStatePill.style.color = "var(--accent)";
+    return;
+  }
+
+  if (mode === "blocked") {
+    saveStatePill.textContent = "Changes: fix cue form";
+    saveStatePill.style.color = "var(--red)";
+    return;
+  }
+
+  saveStatePill.textContent = "Changes: autosave failed";
+  saveStatePill.style.color = "var(--red)";
+}
+
+function rememberApiBase() {
+  if (!browserStorage) {
+    return;
+  }
+  browserStorage.setItem(SESSION_API_BASE_KEY, String(apiBaseInput.value ?? "").trim());
+}
+
+function rememberLastShowId(showId) {
+  if (!browserStorage) {
+    return;
+  }
+  const normalized = String(showId ?? "").trim();
+  if (!normalized) {
+    browserStorage.removeItem(SESSION_LAST_SHOW_ID_KEY);
+    return;
+  }
+  browserStorage.setItem(SESSION_LAST_SHOW_ID_KEY, normalized);
+}
+
+function readRememberedLastShowId() {
+  if (!browserStorage) {
+    return "";
+  }
+  return String(browserStorage.getItem(SESSION_LAST_SHOW_ID_KEY) ?? "").trim();
+}
+
+function readLocalSessionSnapshot() {
+  if (!browserStorage) {
+    return null;
+  }
+
+  const raw = browserStorage.getItem(SESSION_LOCAL_SNAPSHOT_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearLocalSessionSnapshot() {
+  if (!browserStorage) {
+    return;
+  }
+  browserStorage.removeItem(SESSION_LOCAL_SNAPSHOT_KEY);
+}
+
+function persistLocalSessionSnapshot(options = {}) {
+  if (!browserStorage) {
+    return;
+  }
+
+  try {
+    const showfile = createShowfileObject();
+    showfile.runNotes = {
+      ...(showfile.runNotes ?? {}),
+      global: String(globalNotesInput.value ?? "").trim()
+    };
+
+    const snapshot = cueState.getSnapshot();
+    const localSnapshot = {
+      schemaVersion: 1,
+      updatedAt: new Date().toISOString(),
+      hasUnsavedChanges: options.dirty === true,
+      showId: String(showIdInput.value ?? "").trim(),
+      showTitle: String(showTitleInput.value ?? "").trim(),
+      apiBase: String(apiBaseInput.value ?? "").trim(),
+      activeCueId: snapshot.activeCue?.id ?? "",
+      editorDraft: readEditorDraft(),
+      showfile
+    };
+
+    browserStorage.setItem(SESSION_LOCAL_SNAPSHOT_KEY, JSON.stringify(localSnapshot));
+  } catch {
+    // Ignore local snapshot persistence failures; API persistence still covers durability.
+  }
+}
+
+function restoreLocalSessionSnapshot(localSnapshot, options = {}) {
+  if (!localSnapshot || typeof localSnapshot !== "object" || !localSnapshot.showfile) {
+    return false;
+  }
+
+  try {
+    const viewModel = parseShowfileObject(localSnapshot.showfile);
+    setLoadedShowfile(viewModel);
+
+    const storedApiBase = String(localSnapshot.apiBase ?? "").trim();
+    if (storedApiBase) {
+      apiBaseInput.value = normalizeApiBase(storedApiBase);
+      rememberApiBase();
+    }
+
+    const storedShowId = String(localSnapshot.showId ?? viewModel.showId ?? "").trim();
+    if (storedShowId) {
+      showIdInput.value = storedShowId;
+      rememberLastShowId(storedShowId);
+    }
+
+    const storedActiveCueId = String(localSnapshot.activeCueId ?? "").trim();
+    if (storedActiveCueId) {
+      const activeIndex = currentCues.findIndex((cue) => cue.id === storedActiveCueId);
+      if (activeIndex >= 0) {
+        applySnapshot(cueState.setActive(activeIndex));
+      }
+    }
+
+    if (localSnapshot.editorDraft && typeof localSnapshot.editorDraft === "object") {
+      const currentDraft = readEditorDraft();
+      setEditorFromDraft({
+        id: String(localSnapshot.editorDraft.id ?? currentDraft.id ?? ""),
+        type: String(localSnapshot.editorDraft.type ?? currentDraft.type ?? "PPT"),
+        name: String(localSnapshot.editorDraft.name ?? currentDraft.name ?? ""),
+        meta: String(localSnapshot.editorDraft.meta ?? currentDraft.meta ?? ""),
+        preview: String(localSnapshot.editorDraft.preview ?? currentDraft.preview ?? ""),
+        outputsText: String(localSnapshot.editorDraft.outputsText ?? currentDraft.outputsText ?? ""),
+        transitionsText: String(localSnapshot.editorDraft.transitionsText ?? currentDraft.transitionsText ?? ""),
+        notes: String(localSnapshot.editorDraft.notes ?? currentDraft.notes ?? ""),
+        safetyText: String(localSnapshot.editorDraft.safetyText ?? currentDraft.safetyText ?? ""),
+        assetUri: String(localSnapshot.editorDraft.assetUri ?? currentDraft.assetUri ?? "")
+      });
+    }
+
+    if (localSnapshot.hasUnsavedChanges === true) {
+      hasUnsavedChanges = true;
+      if (!autosaveInFlight) {
+        setSaveState("dirty");
+      }
+      scheduleAutosave();
+    } else {
+      markSaved();
+    }
+
+    const statusMessage = options.statusMessage ?? "Restored local session snapshot";
+    pushStatus(statusMessage);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function syncGlobalNotesDraft() {
+  globalNotesText = globalNotesInput.value.trim();
+}
+
+function clearAutosaveTimer() {
+  if (autosaveTimerId !== null) {
+    clearTimeout(autosaveTimerId);
+    autosaveTimerId = null;
+  }
+}
+
+function markSaved() {
+  hasUnsavedChanges = false;
+  clearAutosaveTimer();
+  setSaveState("saved");
+  persistLocalSessionSnapshot({ dirty: false });
+}
+
+function scheduleAutosave(delayMs = AUTOSAVE_DELAY_MS) {
+  clearAutosaveTimer();
+  autosaveTimerId = setTimeout(() => {
+    autosaveTimerId = null;
+    void runAutosave();
+  }, delayMs);
+}
+
+function markDirty() {
+  hasUnsavedChanges = true;
+  if (!autosaveInFlight) {
+    setSaveState("dirty");
+  }
+  persistLocalSessionSnapshot({ dirty: true });
+  scheduleAutosave();
+}
+
 function formatSize(sizeBytes) {
   const bytes = Number(sizeBytes ?? 0);
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -179,6 +515,7 @@ function applyPersistedAssetToEditor(asset) {
   if (!editorForm.elements.preview.value) {
     editorForm.elements.preview.value = asset.fileName;
   }
+  markDirty();
   pushStatus(`Asset URI selected: ${asset.fileName}. Save cue to persist.`);
 }
 
@@ -235,6 +572,217 @@ async function refreshAssetLibrary(options = {}) {
     if (!silent) {
       pushStatus(formatApiError("Asset library", error, getApiBase()), "error");
     }
+  }
+}
+
+function formatUpdatedAt(value) {
+  if (!value) {
+    return "unknown";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "unknown";
+  }
+  return date.toLocaleString();
+}
+
+function renderShowLibrary() {
+  showLibraryList.innerHTML = "";
+  if (persistedShows.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "assetMeta";
+    empty.textContent = "No saved shows yet.";
+    showLibraryList.appendChild(empty);
+    return;
+  }
+
+  for (const show of persistedShows) {
+    const item = document.createElement("div");
+    item.className = "assetRow";
+
+    const top = document.createElement("div");
+    top.className = "assetRowTop";
+    const name = document.createElement("div");
+    name.className = "assetName";
+    name.textContent = show.title || show.showId;
+
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "6px";
+
+    const loadButton = document.createElement("button");
+    loadButton.className = "ghost";
+    loadButton.type = "button";
+    loadButton.textContent = "Load";
+    loadButton.addEventListener("click", async () => {
+      try {
+        showIdInput.value = show.showId;
+        await loadShowById(show.showId);
+      } catch (error) {
+        setApiStatus(false);
+        pushStatus(formatApiError("DB load", error, getApiBase()), "error");
+      }
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "ghost";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", async () => {
+      try {
+        await deleteShowFromApi(show.showId, { apiBase: getApiBase() });
+        if (showIdInput.value.trim() === show.showId) {
+          showIdInput.value = "";
+          rememberLastShowId("");
+          clearLocalSessionSnapshot();
+        }
+        await refreshShowLibrary({ silent: true });
+        pushStatus(`Deleted show from DB: ${show.showId}`);
+      } catch (error) {
+        setApiStatus(false);
+        pushStatus(formatApiError("DB delete", error, getApiBase()), "error");
+      }
+    });
+
+    actions.append(loadButton, deleteButton);
+    top.append(name, actions);
+
+    const meta = document.createElement("div");
+    meta.className = "assetMeta";
+    meta.textContent = `${show.showId} • rev ${show.revision ?? 1} • ${show.cueCount ?? 0} cues`;
+
+    const updated = document.createElement("div");
+    updated.className = "assetMeta";
+    updated.textContent = `Updated ${formatUpdatedAt(show.updatedAt)}`;
+
+    item.append(top, meta, updated);
+    showLibraryList.appendChild(item);
+  }
+}
+
+async function refreshShowLibrary(options = {}) {
+  const silent = options.silent === true;
+  try {
+    persistedShows = await listShowsFromApi({ apiBase: getApiBase() });
+    renderShowLibrary();
+    setApiStatus(true);
+    if (!silent) {
+      pushStatus(`Loaded ${persistedShows.length} show(s) from library`);
+    }
+  } catch (error) {
+    setApiStatus(false);
+    if (!silent) {
+      pushStatus(formatApiError("Show library", error, getApiBase()), "error");
+    }
+  }
+}
+
+async function loadShowById(showId) {
+  const trimmedShowId = String(showId ?? "").trim();
+  if (!trimmedShowId) {
+    pushStatus("Enter a show id before loading", "error");
+    return;
+  }
+
+  showIdInput.value = trimmedShowId;
+  const storedShow = await loadShowFromApi(trimmedShowId, { apiBase: getApiBase() });
+  const viewModel = parseShowfileObject(storedShow.showfile);
+  setLoadedShowfile(viewModel);
+  markSaved();
+  setApiStatus(true);
+  rememberLastShowId(trimmedShowId);
+  await refreshShowLibrary({ silent: true });
+  pushStatus(`Loaded show from DB: ${trimmedShowId}`);
+}
+
+async function restoreLastShowFromSession() {
+  const localSnapshot = readLocalSessionSnapshot();
+  if (localSnapshot?.hasUnsavedChanges === true) {
+    if (restoreLocalSessionSnapshot(localSnapshot, { statusMessage: "Restored unsaved local edits" })) {
+      return;
+    }
+  }
+
+  const rememberedShowId = readRememberedLastShowId();
+  if (!rememberedShowId) {
+    return;
+  }
+
+  showIdInput.value = rememberedShowId;
+  try {
+    await loadShowById(rememberedShowId);
+  } catch (error) {
+    const message = String(error?.message ?? "");
+    if (/show not found/i.test(message)) {
+      if (restoreLocalSessionSnapshot(localSnapshot, { statusMessage: "Restored local session; server show was unavailable" })) {
+        return;
+      }
+      rememberLastShowId("");
+      showIdInput.value = "";
+      return;
+    }
+    rememberLastShowId("");
+    showIdInput.value = "";
+    pushStatus(formatApiError("Session restore", error, getApiBase()), "error");
+  }
+}
+
+async function persistCurrentShow(options = {}) {
+  const mode = options.mode ?? "manual";
+  const silentDraftError = mode === "autosave";
+  if (!commitEditorDraftToState({ errorPrefix: "DB save cue sync", silent: silentDraftError })) {
+    return { ok: false, reason: "draft" };
+  }
+
+  syncGlobalNotesDraft();
+  const showfile = createShowfileObject();
+  const storedShow = await saveShowToApi(showfile, { apiBase: getApiBase() });
+
+  showIdInput.value = storedShow.showId;
+  currentShowTitle = storedShow.title;
+  showTitleInput.value = currentShowTitle;
+  const parsedRevision = Number(storedShow.revision ?? currentRevision);
+  currentRevision = Number.isFinite(parsedRevision) && parsedRevision > 0
+    ? Math.floor(parsedRevision)
+    : currentRevision;
+  currentOutputCount = showfile.outputs.length;
+  currentOutputs = showfile.outputs;
+  syncPills();
+  setApiStatus(true);
+  rememberLastShowId(storedShow.showId);
+  await refreshShowLibrary({ silent: true });
+
+  return { ok: true, storedShow };
+}
+
+async function runAutosave() {
+  if (!hasUnsavedChanges || autosaveInFlight) {
+    return;
+  }
+
+  autosaveInFlight = true;
+  setSaveState("autosaving");
+
+  try {
+    const result = await persistCurrentShow({ mode: "autosave" });
+    if (!result.ok) {
+      setSaveState("blocked");
+      scheduleAutosave(AUTOSAVE_RETRY_MS);
+      return;
+    }
+
+    markSaved();
+  } catch (error) {
+    setApiStatus(false);
+    setSaveState("error");
+    if (Date.now() - lastAutosaveErrorAt > 30000) {
+      pushStatus(formatApiError("Autosave", error, getApiBase()), "error");
+      lastAutosaveErrorAt = Date.now();
+    }
+    scheduleAutosave(AUTOSAVE_RETRY_MS);
+  } finally {
+    autosaveInFlight = false;
   }
 }
 
@@ -313,6 +861,31 @@ function readEditorDraft() {
     safetyText: formData.get("safety"),
     assetUri: formData.get("assetUri")
   };
+}
+
+function commitEditorDraftToState(options = {}) {
+  const errorPrefix = options.errorPrefix ?? "Cue save";
+  const silent = options.silent === true;
+
+  try {
+    const previousCueId = cueState.getSnapshot().activeCue.id;
+    const cue = normalizeCueDraft(readEditorDraft());
+    if (previousCueId !== cue.id && runtimeAssetByCueId.has(previousCueId)) {
+      const runtimeAsset = runtimeAssetByCueId.get(previousCueId);
+      runtimeAssetByCueId.set(cue.id, runtimeAsset);
+      runtimeAssetByCueId.delete(previousCueId);
+    }
+    const next = upsertCue(currentCues, cue);
+    currentCues = next.cues;
+    cueState = createCueState(currentCues, next.activeIndex);
+    applySnapshot(cueState.getSnapshot());
+    return true;
+  } catch (error) {
+    if (!silent) {
+      pushStatus(`${errorPrefix} failed: ${error.message}`, "error");
+    }
+    return false;
+  }
 }
 
 function setEditorFromCue(cue) {
@@ -428,10 +1001,16 @@ function skipCue() {
 
 function setLoadedShowfile(viewModel) {
   currentShowTitle = viewModel.title;
+  const parsedRevision = Number(viewModel.revision ?? 1);
+  currentRevision = Number.isFinite(parsedRevision) && parsedRevision > 0 ? Math.floor(parsedRevision) : 1;
+  currentOutputs = Array.isArray(viewModel.outputs) ? viewModel.outputs : currentOutputs;
   currentOutputCount = viewModel.outputCount;
+  globalNotesText = String(viewModel.runNotesGlobal ?? "");
+  globalNotesInput.value = globalNotesText;
   if (viewModel.showId) {
     showIdInput.value = viewModel.showId;
   }
+  showTitleInput.value = currentShowTitle;
   syncPills();
   replaceCueState(viewModel.cues, 0, "Showfile loaded");
 }
@@ -449,6 +1028,32 @@ importButton.addEventListener("click", (event) => {
   showfileInput.click();
 });
 
+showTitleInput.addEventListener("input", () => {
+  currentShowTitle = String(showTitleInput.value ?? "").trim() || "Untitled Show";
+  syncPills();
+  markDirty();
+});
+
+showIdInput.addEventListener("input", () => {
+  markDirty();
+});
+
+globalNotesInput.addEventListener("input", () => {
+  markDirty();
+});
+
+apiBaseInput.addEventListener("change", () => {
+  rememberApiBase();
+});
+
+apiBaseInput.addEventListener("input", () => {
+  rememberApiBase();
+});
+
+editorForm.addEventListener("input", () => {
+  markDirty();
+});
+
 showfileInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) {
@@ -459,6 +1064,8 @@ showfileInput.addEventListener("change", async (event) => {
     const text = await file.text();
     const viewModel = parseShowfileText(text);
     setLoadedShowfile(viewModel);
+    markDirty();
+    pushStatus("Showfile imported. Save to DB to persist.");
   } catch (error) {
     pushStatus(`Import failed: ${error.message}`, "error");
   } finally {
@@ -468,18 +1075,9 @@ showfileInput.addEventListener("change", async (event) => {
 
 editorForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  try {
-    const previousCueId = cueState.getSnapshot().activeCue.id;
-    const cue = normalizeCueDraft(readEditorDraft());
-    if (previousCueId !== cue.id && runtimeAssetByCueId.has(previousCueId)) {
-      const runtimeAsset = runtimeAssetByCueId.get(previousCueId);
-      runtimeAssetByCueId.set(cue.id, runtimeAsset);
-      runtimeAssetByCueId.delete(previousCueId);
-    }
-    const next = upsertCue(currentCues, cue);
-    replaceCueState(next.cues, next.activeIndex, "Cue saved");
-  } catch (error) {
-    pushStatus(`Save failed: ${error.message}`, "error");
+  if (commitEditorDraftToState({ errorPrefix: "Cue save" })) {
+    markDirty();
+    pushStatus("Cue saved");
   }
 });
 
@@ -500,6 +1098,7 @@ editorDeleteButton.addEventListener("click", (event) => {
     }
     const next = deleteCueById(currentCues, cueId);
     replaceCueState(next.cues, next.activeIndex, "Cue deleted");
+    markDirty();
   } catch (error) {
     pushStatus(`Delete failed: ${error.message}`, "error");
   }
@@ -513,6 +1112,11 @@ editorImportAssetButton.addEventListener("click", (event) => {
 assetLibraryRefreshButton.addEventListener("click", async (event) => {
   event.preventDefault();
   await refreshAssetLibrary();
+});
+
+showLibraryRefreshButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  await refreshShowLibrary();
 });
 
 assetFileInput.addEventListener("change", async (event) => {
@@ -563,7 +1167,8 @@ assetFileInput.addEventListener("change", async (event) => {
     if (!editorForm.elements.preview.value) {
       editorForm.elements.preview.value = file.name;
     }
-    applySnapshot(cueState.getSnapshot());
+    renderProgramPreview(cueState.getSnapshot().activeCue);
+    markDirty();
     pushStatus(`Asset linked: ${file.name}`);
   } catch (error) {
     pushStatus(formatApiError("Asset import", error, getApiBase()), "error");
@@ -574,7 +1179,8 @@ assetFileInput.addEventListener("change", async (event) => {
 
 saveGlobalNotesButton.addEventListener("click", (event) => {
   event.preventDefault();
-  globalNotesText = globalNotesInput.value.trim();
+  syncGlobalNotesDraft();
+  markDirty();
   pushStatus("Global run notes saved");
 });
 
@@ -589,11 +1195,16 @@ addQuickNoteButton.addEventListener("click", (event) => {
   appendCueNote(activeCueId, noteText);
   applySnapshot(cueState.getSnapshot());
   quickNoteInput.value = "";
+  markDirty();
   pushStatus(`Cue note added to ${activeCueId}`);
 });
 
 exportButton.addEventListener("click", (event) => {
   event.preventDefault();
+  if (!commitEditorDraftToState({ errorPrefix: "Export cue sync" })) {
+    return;
+  }
+  syncGlobalNotesDraft();
   const blob = new Blob([createShowfileExport()], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -608,37 +1219,30 @@ exportButton.addEventListener("click", (event) => {
 
 saveToDbButton.addEventListener("click", async (event) => {
   event.preventDefault();
+  clearAutosaveTimer();
+  setSaveState("autosaving");
   try {
-    const showfile = createShowfileObject();
-    if (showIdInput.value.trim()) {
-      showfile.metadata.showId = showIdInput.value.trim();
+    const result = await persistCurrentShow({ mode: "manual" });
+    if (!result.ok) {
+      setSaveState("blocked");
+      return;
     }
-    const storedShow = await saveShowToApi(showfile, { apiBase: getApiBase() });
-    showIdInput.value = storedShow.showId;
-    currentShowTitle = storedShow.title;
-    syncPills();
-    setApiStatus(true);
-    pushStatus(`Saved show to DB: ${storedShow.showId}`);
+
+    markSaved();
+    pushStatus(`Saved show to DB: ${result.storedShow.showId}`);
   } catch (error) {
     setApiStatus(false);
+    setSaveState("error");
+    hasUnsavedChanges = true;
+    scheduleAutosave(AUTOSAVE_RETRY_MS);
     pushStatus(formatApiError("DB save", error, getApiBase()), "error");
   }
 });
 
 loadFromDbButton.addEventListener("click", async (event) => {
   event.preventDefault();
-  const showId = showIdInput.value.trim();
-  if (!showId) {
-    pushStatus("Enter a show id before loading", "error");
-    return;
-  }
-
   try {
-    const storedShow = await loadShowFromApi(showId, { apiBase: getApiBase() });
-    const viewModel = parseShowfileObject(storedShow.showfile);
-    setLoadedShowfile(viewModel);
-    setApiStatus(true);
-    pushStatus(`Loaded show from DB: ${showId}`);
+    await loadShowById(showIdInput.value.trim());
   } catch (error) {
     setApiStatus(false);
     pushStatus(formatApiError("DB load", error, getApiBase()), "error");
@@ -651,6 +1255,7 @@ testApiButton.addEventListener("click", async (event) => {
     const health = await pingApiHealth({ apiBase: getApiBase() });
     setApiStatus(true);
     await refreshAssetLibrary({ silent: true });
+    await refreshShowLibrary({ silent: true });
     pushStatus(`API online (${health.storageMode ?? "runtime"} storage)`);
   } catch (error) {
     setApiStatus(false);
@@ -676,7 +1281,11 @@ window.addEventListener("keydown", (event) => {
 
 syncPills();
 setApiStatus(false);
+setSaveState("saved");
 renderAssetLibrary();
+renderShowLibrary();
 void refreshAssetLibrary({ silent: true });
+void refreshShowLibrary({ silent: true });
 applySnapshot(cueState.getSnapshot());
 pushStatus("Session ready");
+void restoreLastShowFromSession();

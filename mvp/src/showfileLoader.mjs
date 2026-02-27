@@ -4,6 +4,20 @@ function formatOutputLabel(output) {
   return `${roleTitle} - ${output.name}`;
 }
 
+function normalizeOutput(output, index) {
+  const fallbackName = `Output ${index + 1}`;
+  const role = String(output?.role ?? "operator").trim().toLowerCase();
+  const normalizedRole = ["program", "confidence", "operator"].includes(role) ? role : "operator";
+  const name = String(output?.name ?? fallbackName).trim() || fallbackName;
+
+  return {
+    id: String(output?.id ?? `out-${index + 1}`).trim() || `out-${index + 1}`,
+    name,
+    role: normalizedRole,
+    enabled: output?.enabled !== false
+  };
+}
+
 function normalizeCue(cue, outputLabelById) {
   const outputLabels = Array.isArray(cue.outputs)
     ? cue.outputs.map((outputId) => outputLabelById.get(outputId) ?? outputId)
@@ -36,14 +50,21 @@ export function parseShowfileObject(parsed) {
     throw new Error("Showfile requires at least one cue");
   }
 
+  const normalizedOutputs = parsed.outputs.map((output, index) => normalizeOutput(output, index));
   const outputLabelById = new Map(
-    parsed.outputs.map((output) => [output.id, formatOutputLabel(output)])
+    normalizedOutputs.map((output) => [output.id, formatOutputLabel(output)])
   );
+
+  const parsedRevision = Number(parsed.metadata?.revision ?? 1);
+  const revision = Number.isFinite(parsedRevision) && parsedRevision > 0 ? Math.floor(parsedRevision) : 1;
 
   return {
     showId: parsed.metadata?.showId ?? "",
     title: parsed.metadata?.title ?? "Imported Showfile",
-    outputCount: parsed.outputs.length,
+    revision,
+    outputCount: normalizedOutputs.length,
+    outputs: normalizedOutputs,
+    runNotesGlobal: String(parsed.runNotes?.global ?? ""),
     cues: parsed.cues.map((cue) => normalizeCue(cue, outputLabelById))
   };
 }
