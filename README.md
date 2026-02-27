@@ -36,7 +36,7 @@ Available endpoints:
 - `POST /api/assets` (upload asset payloads)
 - `GET /api/assets/:assetId` (serve asset bytes)
 
-The MVP UI now includes `Save to DB` and `Load from DB` actions that target `http://localhost:4173/api/shows` by default.
+The MVP UI now includes `Save to DB` and `Load from DB` actions plus an in-app show library for loading/deleting saved shows.
 
 ## Vercel Previews
 - Serverless API routes are available at:

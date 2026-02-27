@@ -51,6 +51,28 @@ export async function loadShowFromApi(showId, options = {}) {
   return body.show;
 }
 
+export async function listShowsFromApi(options = {}) {
+  const endpoint = buildShowsEndpoint(options.apiBase ?? defaultApiBase());
+  const response = await fetch(endpoint);
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.error ?? "Failed to list shows");
+  }
+  return Array.isArray(body.shows) ? body.shows : [];
+}
+
+export async function deleteShowFromApi(showId, options = {}) {
+  const endpointBase = buildShowsEndpoint(options.apiBase ?? defaultApiBase());
+  const response = await fetch(`${endpointBase}/${encodeURIComponent(showId)}`, {
+    method: "DELETE"
+  });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.error ?? "Failed to delete show");
+  }
+  return body;
+}
+
 export async function uploadAssetToApi(assetPayload, options = {}) {
   const apiBase = normalizeApiBase(options.apiBase ?? defaultApiBase());
   const response = await fetch(`${apiBase}/api/assets`, {

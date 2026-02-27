@@ -6,7 +6,9 @@ import { parseShowfileObject } from "./showfileLoader.mjs";
 import { createImportedAssetRecord, inferCueTypeForAsset } from "./assetImport.mjs";
 import { createRunStatusFeed } from "./runStatus.mjs";
 import {
+  deleteShowFromApi,
   listAssetsFromApi,
+  listShowsFromApi,
   loadShowFromApi,
   pingApiHealth,
   saveShowToApi,
@@ -49,6 +51,9 @@ const loadFromDbButton = document.getElementById("load-from-db");
 const testApiButton = document.getElementById("test-api");
 const apiBaseInput = document.getElementById("api-base-input");
 const showIdInput = document.getElementById("show-id-input");
+const showTitleInput = document.getElementById("show-title-input");
+const showLibraryRefreshButton = document.getElementById("show-library-refresh");
+const showLibraryList = document.getElementById("show-library-list");
 const globalNotesInput = document.getElementById("global-notes");
 const saveGlobalNotesButton = document.getElementById("save-global-notes");
 const quickNoteInput = document.getElementById("quick-note-text");
@@ -57,13 +62,20 @@ const runStatusLog = document.getElementById("run-status-log");
 
 let currentShowTitle = "ACME_2026_Q1.oshow";
 let currentOutputCount = 2;
+let currentRevision = 1;
+let currentOutputs = [
+  { id: "out-program-1", name: "Output 1", role: "program", enabled: true },
+  { id: "out-confidence-2", name: "Output 2", role: "confidence", enabled: true }
+];
 let currentCues = cues;
 let cueState = createCueState(currentCues, 1);
 let globalNotesText = "";
 const runStatusFeed = createRunStatusFeed();
 const runtimeAssetByCueId = new Map();
 let persistedAssets = [];
+let persistedShows = [];
 showIdInput.value = "edited-mvp-show";
+showTitleInput.value = currentShowTitle;
 apiBaseInput.value = normalizeApiBase("");
 
 for (const type of EDITOR_CUE_TYPES) {
@@ -73,50 +85,148 @@ for (const type of EDITOR_CUE_TYPES) {
   editorType.appendChild(option);
 }
 
-function createShowfileExport() {
-  return JSON.stringify(
-    {
-      schemaVersion: "0.1.0",
-      metadata: {
-        showId: "edited-mvp-show",
-        title: currentShowTitle,
-        revision: 1,
-        createdAt: new Date().toISOString()
-      },
-      outputs: [
-        { id: "out-program-1", name: "Program", role: "program", enabled: true },
-        { id: "out-confidence-1", name: "Confidence", role: "confidence", enabled: true }
-      ],
-      runNotes: {
-        global: globalNotesText,
-        statusEvents: runStatusFeed.list()
-      },
-      cues: currentCues.map((cue) => {
-        const cueRecord = {
-          id: cue.id,
-          type: cue.type,
-          name: cue.name,
-          meta: cue.meta,
-          preview: cue.preview,
-          notes: cue.notes,
-          outputs: ["out-program-1"],
-          transitions: cue.transitions,
-          safety: cue.safety
-        };
+function normalizeOutputRole(role) {
+  const normalized = String(role ?? "operator").trim().toLowerCase();
+  return ["program", "confidence", "operator"].includes(normalized) ? normalized : "operator";
+}
 
-        if (cue.assetUri) {
-          cueRecord.asset = { uri: cue.assetUri };
-        }
-        return cueRecord;
-      })
-    },
-    null,
-    2
-  );
+function formatOutputLabel(output) {
+  const roleTitle = output.role.charAt(0).toUpperCase() + output.role.slice(1);
+  return `${roleTitle} - ${output.name}`;
+}
+
+function inferRoleFromLabel(label) {
+  const normalized = String(label ?? "").trim().toLowerCase();
+  if (normalized.startsWith("program -")) {
+    return "program";
+  }
+  if (normalized.startsWith("confidence -")) {
+    return "confidence";
+  }
+  if (normalized.startsWith("operator -")) {
+    return "operator";
+  }
+  return "operator";
+}
+
+function normalizeOutputLabelKey(label) {
+  return String(label ?? "").trim().toLowerCase();
+}
+
+function toSlug(input) {
+  return String(input ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "output";
+}
+
+function buildUniqueOutputId(role, name, usedIds) {
+  const base = `out-${toSlug(role)}-${toSlug(name)}`;
+  if (!usedIds.has(base)) {
+    usedIds.add(base);
+    return base;
+  }
+
+  let suffix = 2;
+  while (usedIds.has(`${base}-${suffix}`)) {
+    suffix += 1;
+  }
+  const unique = `${base}-${suffix}`;
+  usedIds.add(unique);
+  return unique;
+}
+
+function buildOutputDefinitionState() {
+  const defaultOutputs = [{ id: "out-program-1", name: "Output 1", role: "program", enabled: true }];
+  const startingOutputs = currentOutputs.length > 0 ? currentOutputs : defaultOutputs;
+  const outputs = [];
+  const outputIdByLabel = new Map();
+  const usedIds = new Set();
+
+  for (const output of startingOutputs) {
+    const role = normalizeOutputRole(output.role);
+    const name = String(output.name ?? "Output").trim() || "Output";
+    const id = String(output.id ?? "").trim() || buildUniqueOutputId(role, name, usedIds);
+    usedIds.add(id);
+    const normalized = { id, name, role, enabled: output.enabled !== false };
+    outputs.push(normalized);
+    outputIdByLabel.set(normalizeOutputLabelKey(formatOutputLabel(normalized)), normalized.id);
+  }
+
+  for (const cue of currentCues) {
+    const labels = Array.isArray(cue.outputs) ? cue.outputs : [];
+    for (const rawLabel of labels) {
+      const label = String(rawLabel ?? "").trim();
+      const labelKey = normalizeOutputLabelKey(label);
+      if (!labelKey || outputIdByLabel.has(labelKey)) {
+        continue;
+      }
+      const role = inferRoleFromLabel(label);
+      const nameParts = label.split(" - ");
+      const name = nameParts.length > 1 ? nameParts.slice(1).join(" - ").trim() || "Output" : label;
+      const id = buildUniqueOutputId(role, name, usedIds);
+      const normalized = { id, name, role, enabled: true };
+      outputs.push(normalized);
+      outputIdByLabel.set(labelKey, normalized.id);
+    }
+  }
+
+  return { outputs, outputIdByLabel };
 }
 
 function createShowfileObject() {
-  return JSON.parse(createShowfileExport());
+  const showId = String(showIdInput.value ?? "").trim() || "edited-mvp-show";
+  const title = String(showTitleInput.value ?? "").trim() || "Untitled Show";
+  const { outputs, outputIdByLabel } = buildOutputDefinitionState();
+  const fallbackOutputId = outputs[0]?.id ?? "out-program-1";
+
+  return {
+    schemaVersion: "0.1.0",
+    metadata: {
+      showId,
+      title,
+      revision: Math.max(1, Number(currentRevision ?? 1)),
+      createdAt: new Date().toISOString()
+    },
+    outputs,
+    runNotes: {
+      global: globalNotesText,
+      statusEvents: runStatusFeed.list()
+    },
+    cues: currentCues.map((cue) => {
+      const cueOutputLabels = Array.isArray(cue.outputs)
+        ? cue.outputs.map((output) => String(output ?? "").trim()).filter(Boolean)
+        : [];
+      const cueOutputIds = cueOutputLabels
+        .map((label) => outputIdByLabel.get(normalizeOutputLabelKey(label)))
+        .filter(Boolean);
+
+      if (cueOutputIds.length === 0) {
+        cueOutputIds.push(fallbackOutputId);
+      }
+
+      const cueRecord = {
+        id: cue.id,
+        type: cue.type,
+        name: cue.name,
+        meta: cue.meta,
+        preview: cue.preview,
+        notes: cue.notes,
+        outputs: cueOutputIds,
+        transitions: cue.transitions,
+        safety: cue.safety
+      };
+
+      if (cue.assetUri) {
+        cueRecord.asset = { uri: cue.assetUri };
+      }
+      return cueRecord;
+    })
+  };
+}
+
+function createShowfileExport() {
+  return JSON.stringify(createShowfileObject(), null, 2);
 }
 
 function formatLogTime(isoString) {
@@ -236,6 +346,123 @@ async function refreshAssetLibrary(options = {}) {
       pushStatus(formatApiError("Asset library", error, getApiBase()), "error");
     }
   }
+}
+
+function formatUpdatedAt(value) {
+  if (!value) {
+    return "unknown";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "unknown";
+  }
+  return date.toLocaleString();
+}
+
+function renderShowLibrary() {
+  showLibraryList.innerHTML = "";
+  if (persistedShows.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "assetMeta";
+    empty.textContent = "No saved shows yet.";
+    showLibraryList.appendChild(empty);
+    return;
+  }
+
+  for (const show of persistedShows) {
+    const item = document.createElement("div");
+    item.className = "assetRow";
+
+    const top = document.createElement("div");
+    top.className = "assetRowTop";
+    const name = document.createElement("div");
+    name.className = "assetName";
+    name.textContent = show.title || show.showId;
+
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "6px";
+
+    const loadButton = document.createElement("button");
+    loadButton.className = "ghost";
+    loadButton.type = "button";
+    loadButton.textContent = "Load";
+    loadButton.addEventListener("click", async () => {
+      try {
+        showIdInput.value = show.showId;
+        await loadShowById(show.showId);
+      } catch (error) {
+        setApiStatus(false);
+        pushStatus(formatApiError("DB load", error, getApiBase()), "error");
+      }
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "ghost";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", async () => {
+      try {
+        await deleteShowFromApi(show.showId, { apiBase: getApiBase() });
+        if (showIdInput.value.trim() === show.showId) {
+          showIdInput.value = "";
+        }
+        await refreshShowLibrary({ silent: true });
+        pushStatus(`Deleted show from DB: ${show.showId}`);
+      } catch (error) {
+        setApiStatus(false);
+        pushStatus(formatApiError("DB delete", error, getApiBase()), "error");
+      }
+    });
+
+    actions.append(loadButton, deleteButton);
+    top.append(name, actions);
+
+    const meta = document.createElement("div");
+    meta.className = "assetMeta";
+    meta.textContent = `${show.showId} • rev ${show.revision ?? 1} • ${show.cueCount ?? 0} cues`;
+
+    const updated = document.createElement("div");
+    updated.className = "assetMeta";
+    updated.textContent = `Updated ${formatUpdatedAt(show.updatedAt)}`;
+
+    item.append(top, meta, updated);
+    showLibraryList.appendChild(item);
+  }
+}
+
+async function refreshShowLibrary(options = {}) {
+  const silent = options.silent === true;
+  try {
+    persistedShows = await listShowsFromApi({ apiBase: getApiBase() });
+    renderShowLibrary();
+    setApiStatus(true);
+    if (!silent) {
+      pushStatus(`Loaded ${persistedShows.length} show(s) from library`);
+    }
+  } catch (error) {
+    setApiStatus(false);
+    if (!silent) {
+      pushStatus(formatApiError("Show library", error, getApiBase()), "error");
+    }
+  }
+}
+
+async function loadShowById(showId) {
+  const trimmedShowId = String(showId ?? "").trim();
+  if (!trimmedShowId) {
+    pushStatus("Enter a show id before loading", "error");
+    return;
+  }
+
+  showIdInput.value = trimmedShowId;
+  const storedShow = await loadShowFromApi(trimmedShowId, { apiBase: getApiBase() });
+  const viewModel = parseShowfileObject(storedShow.showfile);
+  setLoadedShowfile(viewModel);
+  setApiStatus(true);
+  await refreshShowLibrary({ silent: true });
+  pushStatus(`Loaded show from DB: ${trimmedShowId}`);
 }
 
 function renderProgramPreview(cue) {
@@ -428,10 +655,16 @@ function skipCue() {
 
 function setLoadedShowfile(viewModel) {
   currentShowTitle = viewModel.title;
+  const parsedRevision = Number(viewModel.revision ?? 1);
+  currentRevision = Number.isFinite(parsedRevision) && parsedRevision > 0 ? Math.floor(parsedRevision) : 1;
+  currentOutputs = Array.isArray(viewModel.outputs) ? viewModel.outputs : currentOutputs;
   currentOutputCount = viewModel.outputCount;
+  globalNotesText = String(viewModel.runNotesGlobal ?? "");
+  globalNotesInput.value = globalNotesText;
   if (viewModel.showId) {
     showIdInput.value = viewModel.showId;
   }
+  showTitleInput.value = currentShowTitle;
   syncPills();
   replaceCueState(viewModel.cues, 0, "Showfile loaded");
 }
@@ -447,6 +680,11 @@ document.getElementById("top-go").addEventListener("click", (event) => {
 importButton.addEventListener("click", (event) => {
   event.preventDefault();
   showfileInput.click();
+});
+
+showTitleInput.addEventListener("input", () => {
+  currentShowTitle = String(showTitleInput.value ?? "").trim() || "Untitled Show";
+  syncPills();
 });
 
 showfileInput.addEventListener("change", async (event) => {
@@ -513,6 +751,11 @@ editorImportAssetButton.addEventListener("click", (event) => {
 assetLibraryRefreshButton.addEventListener("click", async (event) => {
   event.preventDefault();
   await refreshAssetLibrary();
+});
+
+showLibraryRefreshButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  await refreshShowLibrary();
 });
 
 assetFileInput.addEventListener("change", async (event) => {
@@ -610,14 +853,19 @@ saveToDbButton.addEventListener("click", async (event) => {
   event.preventDefault();
   try {
     const showfile = createShowfileObject();
-    if (showIdInput.value.trim()) {
-      showfile.metadata.showId = showIdInput.value.trim();
-    }
     const storedShow = await saveShowToApi(showfile, { apiBase: getApiBase() });
     showIdInput.value = storedShow.showId;
     currentShowTitle = storedShow.title;
+    showTitleInput.value = currentShowTitle;
+    const parsedRevision = Number(storedShow.revision ?? currentRevision);
+    currentRevision = Number.isFinite(parsedRevision) && parsedRevision > 0
+      ? Math.floor(parsedRevision)
+      : currentRevision;
+    currentOutputCount = showfile.outputs.length;
+    currentOutputs = showfile.outputs;
     syncPills();
     setApiStatus(true);
+    await refreshShowLibrary({ silent: true });
     pushStatus(`Saved show to DB: ${storedShow.showId}`);
   } catch (error) {
     setApiStatus(false);
@@ -627,18 +875,8 @@ saveToDbButton.addEventListener("click", async (event) => {
 
 loadFromDbButton.addEventListener("click", async (event) => {
   event.preventDefault();
-  const showId = showIdInput.value.trim();
-  if (!showId) {
-    pushStatus("Enter a show id before loading", "error");
-    return;
-  }
-
   try {
-    const storedShow = await loadShowFromApi(showId, { apiBase: getApiBase() });
-    const viewModel = parseShowfileObject(storedShow.showfile);
-    setLoadedShowfile(viewModel);
-    setApiStatus(true);
-    pushStatus(`Loaded show from DB: ${showId}`);
+    await loadShowById(showIdInput.value.trim());
   } catch (error) {
     setApiStatus(false);
     pushStatus(formatApiError("DB load", error, getApiBase()), "error");
@@ -651,6 +889,7 @@ testApiButton.addEventListener("click", async (event) => {
     const health = await pingApiHealth({ apiBase: getApiBase() });
     setApiStatus(true);
     await refreshAssetLibrary({ silent: true });
+    await refreshShowLibrary({ silent: true });
     pushStatus(`API online (${health.storageMode ?? "runtime"} storage)`);
   } catch (error) {
     setApiStatus(false);
@@ -677,6 +916,8 @@ window.addEventListener("keydown", (event) => {
 syncPills();
 setApiStatus(false);
 renderAssetLibrary();
+renderShowLibrary();
 void refreshAssetLibrary({ silent: true });
+void refreshShowLibrary({ silent: true });
 applySnapshot(cueState.getSnapshot());
 pushStatus("Session ready");

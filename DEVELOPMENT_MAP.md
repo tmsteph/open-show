@@ -135,6 +135,7 @@ Deliverables
 - [ ] Operator authentication (single-tenant local accounts to start).
 - [x] Asset upload API with server-managed storage paths and metadata.
 - [x] Browser asset library panel wired to cue editor `asset.uri`.
+- [x] Browser show library panel wired for load/delete of persisted show sessions.
 
 Exit Criteria
 - [ ] Operator can sign in, upload assets, and reload a show with persistent cues/assets across restarts.

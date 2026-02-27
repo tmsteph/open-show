@@ -186,7 +186,21 @@
       display:grid;
       gap:8px;
     }
+    .showLibrary{
+      margin-top:14px;
+      border-top:1px solid var(--line);
+      padding-top:12px;
+      display:grid;
+      gap:8px;
+    }
     .assetLibraryList{
+      display:grid;
+      gap:8px;
+      max-height:220px;
+      overflow:auto;
+      padding-right:4px;
+    }
+    .showLibraryList{
       display:grid;
       gap:8px;
       max-height:220px;
@@ -339,6 +353,7 @@
           <input id="api-base-input" class="btn" style="max-width:220px" placeholder="http://localhost:4173" />
           <a class="btn" href="#" id="test-api">Test API</a>
           <input id="show-id-input" class="btn" style="max-width:160px" placeholder="show-id" />
+          <input id="show-title-input" class="btn" style="max-width:220px" placeholder="show title" />
           <a class="btn" href="#" id="save-to-db">Save to DB</a>
           <a class="btn" href="#" id="load-from-db">Load from DB</a>
           <a class="btn" href="#" id="import-showfile">Import Showfile</a>
@@ -414,6 +429,14 @@
               </div>
               <div class="cueMeta">Use a stored asset to fill the cue editor <code>Asset URI</code>.</div>
               <div id="asset-library-list" class="assetLibraryList"></div>
+            </div>
+            <div class="showLibrary cue">
+              <div class="cueRow">
+                <span class="cueId">SHOW LIBRARY</span>
+                <button class="ghost" id="show-library-refresh" type="button">Refresh</button>
+              </div>
+              <div class="cueMeta">Load or delete persisted shows without retyping IDs.</div>
+              <div id="show-library-list" class="showLibraryList"></div>
             </div>
           </div>
         </section>
