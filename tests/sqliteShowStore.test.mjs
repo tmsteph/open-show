@@ -47,3 +47,21 @@ test("sqlite show store deletes records", async () => {
 
   await store.close();
 });
+
+test("sqlite show store upserts and retrieves assets", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "openshow-sqlite-store-"));
+  const store = await createSqliteShowStore(path.join(dir, "shows.sqlite"));
+
+  await store.upsertAsset("asset-1", {
+    fileName: "slide.png",
+    contentType: "image/png",
+    dataBase64: Buffer.from("img-bytes").toString("base64")
+  });
+
+  const asset = await store.getAsset("asset-1");
+  assert.equal(asset.assetId, "asset-1");
+  assert.equal(asset.fileName, "slide.png");
+  assert.equal(asset.contentType, "image/png");
+
+  await store.close();
+});

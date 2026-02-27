@@ -79,7 +79,7 @@ test("api server deletes shows", async () => {
 
 test("api server stores and serves assets", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "openshow-api-"));
-  const store = createShowStore(path.join(dir, "shows.db.json"));
+  const store = await createSqliteShowStore(path.join(dir, "shows.sqlite"));
   const server = createApiServer({ store });
 
   await new Promise((resolve) => server.listen(0, resolve));
@@ -105,4 +105,5 @@ test("api server stores and serves assets", async () => {
   assert.equal(assetBytes, "asset-bytes");
 
   await new Promise((resolve) => server.close(resolve));
+  await store.close();
 });

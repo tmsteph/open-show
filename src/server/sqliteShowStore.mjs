@@ -37,6 +37,32 @@ function normalizeIncomingShow(showId, payload) {
   };
 }
 
+function normalizeIncomingAsset(assetId, payload) {
+  const resolvedAssetId = String(assetId ?? "").trim();
+  const fileName = String(payload?.fileName ?? "").trim();
+  const contentType = String(payload?.contentType ?? "application/octet-stream").trim();
+  const dataBase64 = String(payload?.dataBase64 ?? "").trim();
+
+  if (!resolvedAssetId) {
+    throw new Error("assetId is required");
+  }
+  if (!fileName) {
+    throw new Error("fileName is required");
+  }
+  if (!dataBase64) {
+    throw new Error("dataBase64 is required");
+  }
+
+  return {
+    assetId: resolvedAssetId,
+    fileName,
+    contentType,
+    dataBase64,
+    sizeBytes: Buffer.from(dataBase64, "base64").length,
+    updatedAt: nowIso()
+  };
+}
+
 async function initDb(db) {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS shows (
@@ -48,6 +74,17 @@ async function initDb(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_shows_updated_at ON shows(updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS assets (
+      asset_id TEXT PRIMARY KEY,
+      file_name TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      data_base64 TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_assets_updated_at ON assets(updated_at DESC);
   `);
 }
 
@@ -111,6 +148,47 @@ export async function createSqliteShowStore(dbFilePath) {
     async deleteShow(showId) {
       const result = await db.run("DELETE FROM shows WHERE show_id = ?", showId);
       return result.changes > 0;
+    },
+
+    async upsertAsset(assetId, payload) {
+      const normalized = normalizeIncomingAsset(assetId, payload);
+      await db.run(
+        `INSERT INTO assets (asset_id, file_name, content_type, data_base64, size_bytes, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(asset_id) DO UPDATE SET
+           file_name = excluded.file_name,
+           content_type = excluded.content_type,
+           data_base64 = excluded.data_base64,
+           size_bytes = excluded.size_bytes,
+           updated_at = excluded.updated_at`,
+        normalized.assetId,
+        normalized.fileName,
+        normalized.contentType,
+        normalized.dataBase64,
+        normalized.sizeBytes,
+        normalized.updatedAt
+      );
+      return normalized;
+    },
+
+    async getAsset(assetId) {
+      const row = await db.get(
+        `SELECT asset_id, file_name, content_type, data_base64, size_bytes, updated_at
+         FROM assets WHERE asset_id = ?`,
+        assetId
+      );
+      if (!row) {
+        return null;
+      }
+
+      return {
+        assetId: row.asset_id,
+        fileName: row.file_name,
+        contentType: row.content_type,
+        dataBase64: row.data_base64,
+        sizeBytes: row.size_bytes,
+        updatedAt: row.updated_at
+      };
     },
 
     async close() {
