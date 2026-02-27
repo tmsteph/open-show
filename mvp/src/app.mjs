@@ -34,6 +34,7 @@ const inspectorSafety = document.getElementById("inspector-safety");
 const statusLabel = document.getElementById("status-label");
 const showfilePill = document.getElementById("showfile-pill");
 const outputsPill = document.getElementById("outputs-pill");
+const saveStatePill = document.getElementById("save-state-pill");
 const apiStatusPill = document.getElementById("api-status-pill");
 const importButton = document.getElementById("import-showfile");
 const showfileInput = document.getElementById("showfile-input");
@@ -76,6 +77,8 @@ let persistedAssets = [];
 let persistedShows = [];
 const SESSION_LAST_SHOW_ID_KEY = "openshow.lastShowId";
 const SESSION_API_BASE_KEY = "openshow.apiBase";
+const AUTOSAVE_DELAY_MS = 2500;
+const AUTOSAVE_RETRY_MS = 10000;
 const browserStorage = (() => {
   try {
     return globalThis.localStorage ?? null;
@@ -83,6 +86,10 @@ const browserStorage = (() => {
     return null;
   }
 })();
+let hasUnsavedChanges = false;
+let autosaveTimerId = null;
+let autosaveInFlight = false;
+let lastAutosaveErrorAt = 0;
 showIdInput.value = "edited-mvp-show";
 showTitleInput.value = currentShowTitle;
 apiBaseInput.value = normalizeApiBase(browserStorage?.getItem(SESSION_API_BASE_KEY) ?? "");
@@ -278,6 +285,35 @@ function setApiStatus(isOnline) {
   apiStatusPill.style.color = isOnline ? "var(--mint)" : "var(--red)";
 }
 
+function setSaveState(mode) {
+  if (mode === "saved") {
+    saveStatePill.textContent = "Changes: saved";
+    saveStatePill.style.color = "var(--mint)";
+    return;
+  }
+
+  if (mode === "dirty") {
+    saveStatePill.textContent = "Changes: unsaved";
+    saveStatePill.style.color = "var(--accent2)";
+    return;
+  }
+
+  if (mode === "autosaving") {
+    saveStatePill.textContent = "Changes: autosaving";
+    saveStatePill.style.color = "var(--accent)";
+    return;
+  }
+
+  if (mode === "blocked") {
+    saveStatePill.textContent = "Changes: fix cue form";
+    saveStatePill.style.color = "var(--red)";
+    return;
+  }
+
+  saveStatePill.textContent = "Changes: autosave failed";
+  saveStatePill.style.color = "var(--red)";
+}
+
 function rememberApiBase() {
   if (!browserStorage) {
     return;
@@ -308,6 +344,35 @@ function syncGlobalNotesDraft() {
   globalNotesText = globalNotesInput.value.trim();
 }
 
+function clearAutosaveTimer() {
+  if (autosaveTimerId !== null) {
+    clearTimeout(autosaveTimerId);
+    autosaveTimerId = null;
+  }
+}
+
+function markSaved() {
+  hasUnsavedChanges = false;
+  clearAutosaveTimer();
+  setSaveState("saved");
+}
+
+function scheduleAutosave(delayMs = AUTOSAVE_DELAY_MS) {
+  clearAutosaveTimer();
+  autosaveTimerId = setTimeout(() => {
+    autosaveTimerId = null;
+    void runAutosave();
+  }, delayMs);
+}
+
+function markDirty() {
+  hasUnsavedChanges = true;
+  if (!autosaveInFlight) {
+    setSaveState("dirty");
+  }
+  scheduleAutosave();
+}
+
 function formatSize(sizeBytes) {
   const bytes = Number(sizeBytes ?? 0);
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -328,6 +393,7 @@ function applyPersistedAssetToEditor(asset) {
   if (!editorForm.elements.preview.value) {
     editorForm.elements.preview.value = asset.fileName;
   }
+  markDirty();
   pushStatus(`Asset URI selected: ${asset.fileName}. Save cue to persist.`);
 }
 
@@ -500,6 +566,7 @@ async function loadShowById(showId) {
   const storedShow = await loadShowFromApi(trimmedShowId, { apiBase: getApiBase() });
   const viewModel = parseShowfileObject(storedShow.showfile);
   setLoadedShowfile(viewModel);
+  markSaved();
   setApiStatus(true);
   rememberLastShowId(trimmedShowId);
   await refreshShowLibrary({ silent: true });
@@ -518,6 +585,64 @@ async function restoreLastShowFromSession() {
   } catch (error) {
     rememberLastShowId("");
     pushStatus(formatApiError("Session restore", error, getApiBase()), "error");
+  }
+}
+
+async function persistCurrentShow(options = {}) {
+  const mode = options.mode ?? "manual";
+  const silentDraftError = mode === "autosave";
+  if (!commitEditorDraftToState({ errorPrefix: "DB save cue sync", silent: silentDraftError })) {
+    return { ok: false, reason: "draft" };
+  }
+
+  syncGlobalNotesDraft();
+  const showfile = createShowfileObject();
+  const storedShow = await saveShowToApi(showfile, { apiBase: getApiBase() });
+
+  showIdInput.value = storedShow.showId;
+  currentShowTitle = storedShow.title;
+  showTitleInput.value = currentShowTitle;
+  const parsedRevision = Number(storedShow.revision ?? currentRevision);
+  currentRevision = Number.isFinite(parsedRevision) && parsedRevision > 0
+    ? Math.floor(parsedRevision)
+    : currentRevision;
+  currentOutputCount = showfile.outputs.length;
+  currentOutputs = showfile.outputs;
+  syncPills();
+  setApiStatus(true);
+  rememberLastShowId(storedShow.showId);
+  await refreshShowLibrary({ silent: true });
+
+  return { ok: true, storedShow };
+}
+
+async function runAutosave() {
+  if (!hasUnsavedChanges || autosaveInFlight) {
+    return;
+  }
+
+  autosaveInFlight = true;
+  setSaveState("autosaving");
+
+  try {
+    const result = await persistCurrentShow({ mode: "autosave" });
+    if (!result.ok) {
+      setSaveState("blocked");
+      scheduleAutosave(AUTOSAVE_RETRY_MS);
+      return;
+    }
+
+    markSaved();
+  } catch (error) {
+    setApiStatus(false);
+    setSaveState("error");
+    if (Date.now() - lastAutosaveErrorAt > 30000) {
+      pushStatus(formatApiError("Autosave", error, getApiBase()), "error");
+      lastAutosaveErrorAt = Date.now();
+    }
+    scheduleAutosave(AUTOSAVE_RETRY_MS);
+  } finally {
+    autosaveInFlight = false;
   }
 }
 
@@ -600,6 +725,7 @@ function readEditorDraft() {
 
 function commitEditorDraftToState(options = {}) {
   const errorPrefix = options.errorPrefix ?? "Cue save";
+  const silent = options.silent === true;
 
   try {
     const previousCueId = cueState.getSnapshot().activeCue.id;
@@ -615,7 +741,9 @@ function commitEditorDraftToState(options = {}) {
     applySnapshot(cueState.getSnapshot());
     return true;
   } catch (error) {
-    pushStatus(`${errorPrefix} failed: ${error.message}`, "error");
+    if (!silent) {
+      pushStatus(`${errorPrefix} failed: ${error.message}`, "error");
+    }
     return false;
   }
 }
@@ -763,10 +891,27 @@ importButton.addEventListener("click", (event) => {
 showTitleInput.addEventListener("input", () => {
   currentShowTitle = String(showTitleInput.value ?? "").trim() || "Untitled Show";
   syncPills();
+  markDirty();
+});
+
+showIdInput.addEventListener("input", () => {
+  markDirty();
+});
+
+globalNotesInput.addEventListener("input", () => {
+  markDirty();
 });
 
 apiBaseInput.addEventListener("change", () => {
   rememberApiBase();
+});
+
+apiBaseInput.addEventListener("input", () => {
+  rememberApiBase();
+});
+
+editorForm.addEventListener("input", () => {
+  markDirty();
 });
 
 showfileInput.addEventListener("change", async (event) => {
@@ -779,6 +924,8 @@ showfileInput.addEventListener("change", async (event) => {
     const text = await file.text();
     const viewModel = parseShowfileText(text);
     setLoadedShowfile(viewModel);
+    markDirty();
+    pushStatus("Showfile imported. Save to DB to persist.");
   } catch (error) {
     pushStatus(`Import failed: ${error.message}`, "error");
   } finally {
@@ -789,6 +936,7 @@ showfileInput.addEventListener("change", async (event) => {
 editorForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (commitEditorDraftToState({ errorPrefix: "Cue save" })) {
+    markDirty();
     pushStatus("Cue saved");
   }
 });
@@ -810,6 +958,7 @@ editorDeleteButton.addEventListener("click", (event) => {
     }
     const next = deleteCueById(currentCues, cueId);
     replaceCueState(next.cues, next.activeIndex, "Cue deleted");
+    markDirty();
   } catch (error) {
     pushStatus(`Delete failed: ${error.message}`, "error");
   }
@@ -878,7 +1027,8 @@ assetFileInput.addEventListener("change", async (event) => {
     if (!editorForm.elements.preview.value) {
       editorForm.elements.preview.value = file.name;
     }
-    applySnapshot(cueState.getSnapshot());
+    renderProgramPreview(cueState.getSnapshot().activeCue);
+    markDirty();
     pushStatus(`Asset linked: ${file.name}`);
   } catch (error) {
     pushStatus(formatApiError("Asset import", error, getApiBase()), "error");
@@ -890,6 +1040,7 @@ assetFileInput.addEventListener("change", async (event) => {
 saveGlobalNotesButton.addEventListener("click", (event) => {
   event.preventDefault();
   syncGlobalNotesDraft();
+  markDirty();
   pushStatus("Global run notes saved");
 });
 
@@ -904,6 +1055,7 @@ addQuickNoteButton.addEventListener("click", (event) => {
   appendCueNote(activeCueId, noteText);
   applySnapshot(cueState.getSnapshot());
   quickNoteInput.value = "";
+  markDirty();
   pushStatus(`Cue note added to ${activeCueId}`);
 });
 
@@ -927,29 +1079,22 @@ exportButton.addEventListener("click", (event) => {
 
 saveToDbButton.addEventListener("click", async (event) => {
   event.preventDefault();
-  if (!commitEditorDraftToState({ errorPrefix: "DB save cue sync" })) {
-    return;
-  }
-  syncGlobalNotesDraft();
+  clearAutosaveTimer();
+  setSaveState("autosaving");
   try {
-    const showfile = createShowfileObject();
-    const storedShow = await saveShowToApi(showfile, { apiBase: getApiBase() });
-    showIdInput.value = storedShow.showId;
-    currentShowTitle = storedShow.title;
-    showTitleInput.value = currentShowTitle;
-    const parsedRevision = Number(storedShow.revision ?? currentRevision);
-    currentRevision = Number.isFinite(parsedRevision) && parsedRevision > 0
-      ? Math.floor(parsedRevision)
-      : currentRevision;
-    currentOutputCount = showfile.outputs.length;
-    currentOutputs = showfile.outputs;
-    syncPills();
-    setApiStatus(true);
-    rememberLastShowId(storedShow.showId);
-    await refreshShowLibrary({ silent: true });
-    pushStatus(`Saved show to DB: ${storedShow.showId}`);
+    const result = await persistCurrentShow({ mode: "manual" });
+    if (!result.ok) {
+      setSaveState("blocked");
+      return;
+    }
+
+    markSaved();
+    pushStatus(`Saved show to DB: ${result.storedShow.showId}`);
   } catch (error) {
     setApiStatus(false);
+    setSaveState("error");
+    hasUnsavedChanges = true;
+    scheduleAutosave(AUTOSAVE_RETRY_MS);
     pushStatus(formatApiError("DB save", error, getApiBase()), "error");
   }
 });
@@ -996,6 +1141,7 @@ window.addEventListener("keydown", (event) => {
 
 syncPills();
 setApiStatus(false);
+setSaveState("saved");
 renderAssetLibrary();
 renderShowLibrary();
 void refreshAssetLibrary({ silent: true });
