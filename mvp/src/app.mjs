@@ -74,9 +74,18 @@ const runStatusFeed = createRunStatusFeed();
 const runtimeAssetByCueId = new Map();
 let persistedAssets = [];
 let persistedShows = [];
+const SESSION_LAST_SHOW_ID_KEY = "openshow.lastShowId";
+const SESSION_API_BASE_KEY = "openshow.apiBase";
+const browserStorage = (() => {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+})();
 showIdInput.value = "edited-mvp-show";
 showTitleInput.value = currentShowTitle;
-apiBaseInput.value = normalizeApiBase("");
+apiBaseInput.value = normalizeApiBase(browserStorage?.getItem(SESSION_API_BASE_KEY) ?? "");
 
 for (const type of EDITOR_CUE_TYPES) {
   const option = document.createElement("option");
@@ -269,6 +278,36 @@ function setApiStatus(isOnline) {
   apiStatusPill.style.color = isOnline ? "var(--mint)" : "var(--red)";
 }
 
+function rememberApiBase() {
+  if (!browserStorage) {
+    return;
+  }
+  browserStorage.setItem(SESSION_API_BASE_KEY, String(apiBaseInput.value ?? "").trim());
+}
+
+function rememberLastShowId(showId) {
+  if (!browserStorage) {
+    return;
+  }
+  const normalized = String(showId ?? "").trim();
+  if (!normalized) {
+    browserStorage.removeItem(SESSION_LAST_SHOW_ID_KEY);
+    return;
+  }
+  browserStorage.setItem(SESSION_LAST_SHOW_ID_KEY, normalized);
+}
+
+function readRememberedLastShowId() {
+  if (!browserStorage) {
+    return "";
+  }
+  return String(browserStorage.getItem(SESSION_LAST_SHOW_ID_KEY) ?? "").trim();
+}
+
+function syncGlobalNotesDraft() {
+  globalNotesText = globalNotesInput.value.trim();
+}
+
 function formatSize(sizeBytes) {
   const bytes = Number(sizeBytes ?? 0);
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -407,6 +446,7 @@ function renderShowLibrary() {
         await deleteShowFromApi(show.showId, { apiBase: getApiBase() });
         if (showIdInput.value.trim() === show.showId) {
           showIdInput.value = "";
+          rememberLastShowId("");
         }
         await refreshShowLibrary({ silent: true });
         pushStatus(`Deleted show from DB: ${show.showId}`);
@@ -461,8 +501,24 @@ async function loadShowById(showId) {
   const viewModel = parseShowfileObject(storedShow.showfile);
   setLoadedShowfile(viewModel);
   setApiStatus(true);
+  rememberLastShowId(trimmedShowId);
   await refreshShowLibrary({ silent: true });
   pushStatus(`Loaded show from DB: ${trimmedShowId}`);
+}
+
+async function restoreLastShowFromSession() {
+  const rememberedShowId = readRememberedLastShowId();
+  if (!rememberedShowId) {
+    return;
+  }
+
+  showIdInput.value = rememberedShowId;
+  try {
+    await loadShowById(rememberedShowId);
+  } catch (error) {
+    rememberLastShowId("");
+    pushStatus(formatApiError("Session restore", error, getApiBase()), "error");
+  }
 }
 
 function renderProgramPreview(cue) {
@@ -540,6 +596,28 @@ function readEditorDraft() {
     safetyText: formData.get("safety"),
     assetUri: formData.get("assetUri")
   };
+}
+
+function commitEditorDraftToState(options = {}) {
+  const errorPrefix = options.errorPrefix ?? "Cue save";
+
+  try {
+    const previousCueId = cueState.getSnapshot().activeCue.id;
+    const cue = normalizeCueDraft(readEditorDraft());
+    if (previousCueId !== cue.id && runtimeAssetByCueId.has(previousCueId)) {
+      const runtimeAsset = runtimeAssetByCueId.get(previousCueId);
+      runtimeAssetByCueId.set(cue.id, runtimeAsset);
+      runtimeAssetByCueId.delete(previousCueId);
+    }
+    const next = upsertCue(currentCues, cue);
+    currentCues = next.cues;
+    cueState = createCueState(currentCues, next.activeIndex);
+    applySnapshot(cueState.getSnapshot());
+    return true;
+  } catch (error) {
+    pushStatus(`${errorPrefix} failed: ${error.message}`, "error");
+    return false;
+  }
 }
 
 function setEditorFromCue(cue) {
@@ -687,6 +765,10 @@ showTitleInput.addEventListener("input", () => {
   syncPills();
 });
 
+apiBaseInput.addEventListener("change", () => {
+  rememberApiBase();
+});
+
 showfileInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) {
@@ -706,18 +788,8 @@ showfileInput.addEventListener("change", async (event) => {
 
 editorForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  try {
-    const previousCueId = cueState.getSnapshot().activeCue.id;
-    const cue = normalizeCueDraft(readEditorDraft());
-    if (previousCueId !== cue.id && runtimeAssetByCueId.has(previousCueId)) {
-      const runtimeAsset = runtimeAssetByCueId.get(previousCueId);
-      runtimeAssetByCueId.set(cue.id, runtimeAsset);
-      runtimeAssetByCueId.delete(previousCueId);
-    }
-    const next = upsertCue(currentCues, cue);
-    replaceCueState(next.cues, next.activeIndex, "Cue saved");
-  } catch (error) {
-    pushStatus(`Save failed: ${error.message}`, "error");
+  if (commitEditorDraftToState({ errorPrefix: "Cue save" })) {
+    pushStatus("Cue saved");
   }
 });
 
@@ -817,7 +889,7 @@ assetFileInput.addEventListener("change", async (event) => {
 
 saveGlobalNotesButton.addEventListener("click", (event) => {
   event.preventDefault();
-  globalNotesText = globalNotesInput.value.trim();
+  syncGlobalNotesDraft();
   pushStatus("Global run notes saved");
 });
 
@@ -837,6 +909,10 @@ addQuickNoteButton.addEventListener("click", (event) => {
 
 exportButton.addEventListener("click", (event) => {
   event.preventDefault();
+  if (!commitEditorDraftToState({ errorPrefix: "Export cue sync" })) {
+    return;
+  }
+  syncGlobalNotesDraft();
   const blob = new Blob([createShowfileExport()], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -851,6 +927,10 @@ exportButton.addEventListener("click", (event) => {
 
 saveToDbButton.addEventListener("click", async (event) => {
   event.preventDefault();
+  if (!commitEditorDraftToState({ errorPrefix: "DB save cue sync" })) {
+    return;
+  }
+  syncGlobalNotesDraft();
   try {
     const showfile = createShowfileObject();
     const storedShow = await saveShowToApi(showfile, { apiBase: getApiBase() });
@@ -865,6 +945,7 @@ saveToDbButton.addEventListener("click", async (event) => {
     currentOutputs = showfile.outputs;
     syncPills();
     setApiStatus(true);
+    rememberLastShowId(storedShow.showId);
     await refreshShowLibrary({ silent: true });
     pushStatus(`Saved show to DB: ${storedShow.showId}`);
   } catch (error) {
@@ -921,3 +1002,4 @@ void refreshAssetLibrary({ silent: true });
 void refreshShowLibrary({ silent: true });
 applySnapshot(cueState.getSnapshot());
 pushStatus("Session ready");
+void restoreLastShowFromSession();
