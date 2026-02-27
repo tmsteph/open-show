@@ -70,6 +70,21 @@ export function createApiServer({ store }) {
         return;
       }
 
+      if (method === "GET" && url.pathname === "/api/assets") {
+        const assets = await store.listAssets();
+        sendJson(response, 200, {
+          assets: assets.map((asset) => ({
+            assetId: asset.assetId,
+            fileName: asset.fileName,
+            contentType: asset.contentType,
+            sizeBytes: asset.sizeBytes,
+            updatedAt: asset.updatedAt,
+            uri: `/api/assets/${encodeURIComponent(asset.assetId)}`
+          }))
+        });
+        return;
+      }
+
       if (method === "POST" && url.pathname === "/api/assets") {
         const body = await readJsonBody(request);
         const assetId = body?.assetId ?? randomUUID();

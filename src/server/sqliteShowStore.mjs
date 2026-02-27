@@ -63,6 +63,16 @@ function normalizeIncomingAsset(assetId, payload) {
   };
 }
 
+function toAssetSummary(row) {
+  return {
+    assetId: row.asset_id,
+    fileName: row.file_name,
+    contentType: row.content_type,
+    sizeBytes: row.size_bytes,
+    updatedAt: row.updated_at
+  };
+}
+
 async function initDb(db) {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS shows (
@@ -148,6 +158,14 @@ export async function createSqliteShowStore(dbFilePath) {
     async deleteShow(showId) {
       const result = await db.run("DELETE FROM shows WHERE show_id = ?", showId);
       return result.changes > 0;
+    },
+
+    async listAssets() {
+      const rows = await db.all(
+        `SELECT asset_id, file_name, content_type, size_bytes, updated_at
+         FROM assets ORDER BY updated_at DESC`
+      );
+      return rows.map((row) => toAssetSummary(row));
     },
 
     async upsertAsset(assetId, payload) {

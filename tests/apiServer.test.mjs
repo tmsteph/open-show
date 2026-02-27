@@ -98,6 +98,13 @@ test("api server stores and serves assets", async () => {
   assert.equal(uploadResponse.status, 201);
   const uploadBody = await uploadResponse.json();
 
+  const listAssetsResponse = await fetch(`${base}/api/assets`);
+  assert.equal(listAssetsResponse.status, 200);
+  const listAssetsBody = await listAssetsResponse.json();
+  assert.equal(listAssetsBody.assets.length, 1);
+  assert.equal(listAssetsBody.assets[0].assetId, uploadBody.asset.assetId);
+  assert.equal(listAssetsBody.assets[0].uri, uploadBody.asset.uri);
+
   const assetResponse = await fetch(`${base}${uploadBody.asset.uri}`);
   assert.equal(assetResponse.status, 200);
   assert.equal(assetResponse.headers.get("content-type"), "audio/wav");

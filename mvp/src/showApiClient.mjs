@@ -67,6 +67,17 @@ export async function uploadAssetToApi(assetPayload, options = {}) {
   return body.asset;
 }
 
+export async function listAssetsFromApi(options = {}) {
+  const apiBase = normalizeApiBase(options.apiBase ?? defaultApiBase());
+  const response = await fetch(`${apiBase}/api/assets`);
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.error ?? "Failed to list assets");
+  }
+
+  return Array.isArray(body.assets) ? body.assets : [];
+}
+
 export async function pingApiHealth(options = {}) {
   const endpoint = buildHealthEndpoint(options.apiBase ?? defaultApiBase());
   const response = await fetch(endpoint);

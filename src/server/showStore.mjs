@@ -29,6 +29,16 @@ function toSummary(show) {
   };
 }
 
+function toAssetSummary(asset) {
+  return {
+    assetId: asset.assetId,
+    fileName: asset.fileName,
+    contentType: asset.contentType,
+    sizeBytes: asset.sizeBytes,
+    updatedAt: asset.updatedAt
+  };
+}
+
 function normalizeIncomingShow(showId, payload) {
   const resolvedShowId = String(showId ?? payload?.metadata?.showId ?? "").trim();
   const title = String(payload?.metadata?.title ?? "Untitled Show").trim();
@@ -129,6 +139,13 @@ export function createShowStore(dbFilePath) {
         await writeDb(db);
       }
       return deleted;
+    },
+
+    async listAssets() {
+      const db = await readDb();
+      return db.assets
+        .map((asset) => toAssetSummary(asset))
+        .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
     },
 
     async upsertAsset(assetId, payload) {

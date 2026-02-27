@@ -59,9 +59,13 @@ test("sqlite show store upserts and retrieves assets", async () => {
   });
 
   const asset = await store.getAsset("asset-1");
+  const assets = await store.listAssets();
   assert.equal(asset.assetId, "asset-1");
   assert.equal(asset.fileName, "slide.png");
   assert.equal(asset.contentType, "image/png");
+  assert.equal(assets.length, 1);
+  assert.equal(assets[0].assetId, "asset-1");
+  assert.equal("dataBase64" in assets[0], false);
 
   await store.close();
 });

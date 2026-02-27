@@ -1,6 +1,6 @@
 module.exports = async function handler(req, res) {
   const { getRuntimeShowStore } = await import("../../src/server/runtimeShowStore.mjs");
-  const store = getRuntimeShowStore();
+  const store = await getRuntimeShowStore();
   const assetId = String(req.query?.assetId ?? "").trim();
 
   if (!assetId) {
