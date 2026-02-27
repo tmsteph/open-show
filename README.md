@@ -32,6 +32,8 @@ Available endpoints:
 - `GET /api/shows/:showId`
 - `PUT /api/shows/:showId`
 - `DELETE /api/shows/:showId`
+- `POST /api/assets` (upload asset payloads)
+- `GET /api/assets/:assetId` (serve asset bytes)
 
 The MVP UI now includes `Save to DB` and `Load from DB` actions that target `http://localhost:4173/api/shows` by default.
 
