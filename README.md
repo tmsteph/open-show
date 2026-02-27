@@ -32,6 +32,7 @@ Available endpoints:
 - `GET /api/shows/:showId`
 - `PUT /api/shows/:showId`
 - `DELETE /api/shows/:showId`
+- `GET /api/assets` (list uploaded asset metadata + URIs)
 - `POST /api/assets` (upload asset payloads)
 - `GET /api/assets/:assetId` (serve asset bytes)
 

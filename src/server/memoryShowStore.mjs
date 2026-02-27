@@ -12,6 +12,16 @@ function toSummary(show) {
   };
 }
 
+function toAssetSummary(asset) {
+  return {
+    assetId: asset.assetId,
+    fileName: asset.fileName,
+    contentType: asset.contentType,
+    sizeBytes: asset.sizeBytes,
+    updatedAt: asset.updatedAt
+  };
+}
+
 function normalizeIncomingShow(showId, payload) {
   const resolvedShowId = String(showId ?? payload?.metadata?.showId ?? "").trim();
   const title = String(payload?.metadata?.title ?? "Untitled Show").trim();
@@ -84,6 +94,12 @@ export function createMemoryShowStore() {
       const initialLength = db.shows.length;
       db.shows = db.shows.filter((show) => show.showId !== showId);
       return db.shows.length !== initialLength;
+    },
+
+    async listAssets() {
+      return db.assets
+        .map((asset) => toAssetSummary(asset))
+        .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
     },
 
     async upsertAsset(assetId, payload) {

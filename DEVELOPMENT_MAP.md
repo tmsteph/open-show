@@ -1,6 +1,6 @@
 # OpenShow Development Map
 
-Updated: 2026-02-26
+Updated: 2026-02-27
 
 ## Purpose
 Build a production-ready, browser-first show control platform, starting with a corporate playback MVP that can replace a typical QLab + presentation stack.
@@ -134,7 +134,7 @@ Deliverables
 - [x] MVP connectivity UX for persistence API (health check, endpoint config, actionable error states).
 - [ ] Operator authentication (single-tenant local accounts to start).
 - [x] Asset upload API with server-managed storage paths and metadata.
-- [ ] Browser asset library panel wired to cue editor `asset.uri`.
+- [x] Browser asset library panel wired to cue editor `asset.uri`.
 
 Exit Criteria
 - [ ] Operator can sign in, upload assets, and reload a show with persistent cues/assets across restarts.

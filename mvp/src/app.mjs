@@ -3,9 +3,15 @@ import { createCueState } from "./cueState.mjs";
 import { getTransportCommandForKeyEvent } from "./hotkeys.mjs";
 import { parseShowfileText } from "./showfileLoader.mjs";
 import { parseShowfileObject } from "./showfileLoader.mjs";
-import { createImportedAssetRecord } from "./assetImport.mjs";
+import { createImportedAssetRecord, inferCueTypeForAsset } from "./assetImport.mjs";
 import { createRunStatusFeed } from "./runStatus.mjs";
-import { loadShowFromApi, pingApiHealth, saveShowToApi, uploadAssetToApi } from "./showApiClient.mjs";
+import {
+  listAssetsFromApi,
+  loadShowFromApi,
+  pingApiHealth,
+  saveShowToApi,
+  uploadAssetToApi
+} from "./showApiClient.mjs";
 import { formatApiError, normalizeApiBase } from "./apiUx.mjs";
 import {
   EDITOR_CUE_TYPES,
@@ -35,6 +41,8 @@ const editorNewButton = document.getElementById("editor-new");
 const editorDeleteButton = document.getElementById("editor-delete");
 const editorImportAssetButton = document.getElementById("editor-import-asset");
 const assetFileInput = document.getElementById("asset-file-input");
+const assetLibraryRefreshButton = document.getElementById("asset-library-refresh");
+const assetLibraryList = document.getElementById("asset-library-list");
 const exportButton = document.getElementById("export-showfile");
 const saveToDbButton = document.getElementById("save-to-db");
 const loadFromDbButton = document.getElementById("load-from-db");
@@ -54,6 +62,7 @@ let cueState = createCueState(currentCues, 1);
 let globalNotesText = "";
 const runStatusFeed = createRunStatusFeed();
 const runtimeAssetByCueId = new Map();
+let persistedAssets = [];
 showIdInput.value = "edited-mvp-show";
 apiBaseInput.value = normalizeApiBase("");
 
@@ -148,6 +157,85 @@ function getApiBase() {
 function setApiStatus(isOnline) {
   apiStatusPill.textContent = `API: ${isOnline ? "online" : "offline"}`;
   apiStatusPill.style.color = isOnline ? "var(--mint)" : "var(--red)";
+}
+
+function formatSize(sizeBytes) {
+  const bytes = Number(sizeBytes ?? 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function applyPersistedAssetToEditor(asset) {
+  editorForm.elements.assetUri.value = asset.uri;
+  editorForm.elements.type.value = inferCueTypeForAsset(asset.fileName, asset.contentType);
+  if (!editorForm.elements.preview.value) {
+    editorForm.elements.preview.value = asset.fileName;
+  }
+  pushStatus(`Asset URI selected: ${asset.fileName}. Save cue to persist.`);
+}
+
+function renderAssetLibrary() {
+  assetLibraryList.innerHTML = "";
+  if (persistedAssets.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "assetMeta";
+    empty.textContent = "No persisted assets yet.";
+    assetLibraryList.appendChild(empty);
+    return;
+  }
+
+  for (const asset of persistedAssets) {
+    const item = document.createElement("div");
+    item.className = "assetRow";
+
+    const top = document.createElement("div");
+    top.className = "assetRowTop";
+    const name = document.createElement("div");
+    name.className = "assetName";
+    name.textContent = asset.fileName;
+    const useButton = document.createElement("button");
+    useButton.className = "ghost";
+    useButton.type = "button";
+    useButton.textContent = "Use";
+    useButton.addEventListener("click", () => applyPersistedAssetToEditor(asset));
+    top.append(name, useButton);
+
+    const meta = document.createElement("div");
+    meta.className = "assetMeta";
+    meta.textContent = `${asset.contentType || "application/octet-stream"} • ${formatSize(asset.sizeBytes)}`;
+
+    const uri = document.createElement("div");
+    uri.className = "assetMeta";
+    uri.textContent = asset.uri;
+
+    item.append(top, meta, uri);
+    assetLibraryList.appendChild(item);
+  }
+}
+
+async function refreshAssetLibrary(options = {}) {
+  const silent = options.silent === true;
+  try {
+    persistedAssets = await listAssetsFromApi({ apiBase: getApiBase() });
+    renderAssetLibrary();
+    setApiStatus(true);
+    if (!silent) {
+      pushStatus(`Loaded ${persistedAssets.length} asset(s) from library`);
+    }
+  } catch (error) {
+    setApiStatus(false);
+    if (!silent) {
+      pushStatus(formatApiError("Asset library", error, getApiBase()), "error");
+    }
+  }
 }
 
 function renderProgramPreview(cue) {
@@ -422,6 +510,11 @@ editorImportAssetButton.addEventListener("click", (event) => {
   assetFileInput.click();
 });
 
+assetLibraryRefreshButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  await refreshAssetLibrary();
+});
+
 assetFileInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) {
@@ -448,6 +541,7 @@ assetFileInput.addEventListener("change", async (event) => {
       );
       persistedAssetUri = assetUpload.uri ?? persistedAssetUri;
       setApiStatus(true);
+      await refreshAssetLibrary({ silent: true });
     } catch (uploadError) {
       setApiStatus(false);
       pushStatus(formatApiError("Asset upload", uploadError, getApiBase()), "error");
@@ -556,6 +650,7 @@ testApiButton.addEventListener("click", async (event) => {
   try {
     const health = await pingApiHealth({ apiBase: getApiBase() });
     setApiStatus(true);
+    await refreshAssetLibrary({ silent: true });
     pushStatus(`API online (${health.storageMode ?? "runtime"} storage)`);
   } catch (error) {
     setApiStatus(false);
@@ -581,5 +676,7 @@ window.addEventListener("keydown", (event) => {
 
 syncPills();
 setApiStatus(false);
+renderAssetLibrary();
+void refreshAssetLibrary({ silent: true });
 applySnapshot(cueState.getSnapshot());
 pushStatus("Session ready");

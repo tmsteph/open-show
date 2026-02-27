@@ -23,9 +23,24 @@ async function readJsonBody(req) {
 
 module.exports = async function handler(req, res) {
   const { getRuntimeShowStore } = await import("../../src/server/runtimeShowStore.mjs");
-  const store = getRuntimeShowStore();
+  const store = await getRuntimeShowStore();
 
   try {
+    if (req.method === "GET") {
+      const assets = await store.listAssets();
+      res.status(200).json({
+        assets: assets.map((asset) => ({
+          assetId: asset.assetId,
+          fileName: asset.fileName,
+          contentType: asset.contentType,
+          sizeBytes: asset.sizeBytes,
+          updatedAt: asset.updatedAt,
+          uri: `/api/assets/${encodeURIComponent(asset.assetId)}`
+        }))
+      });
+      return;
+    }
+
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
       return;
