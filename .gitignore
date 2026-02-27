@@ -1,2 +1,5 @@
 node_modules/
 data/shows.db.json
+data/openshow.sqlite
+data/openshow.sqlite-shm
+data/openshow.sqlite-wal

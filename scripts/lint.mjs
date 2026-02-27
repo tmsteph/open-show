@@ -13,6 +13,7 @@ const jsFiles = [
   "src/app/playbackSession.mjs",
   "src/server/showStore.mjs",
   "src/server/memoryShowStore.mjs",
+  "src/server/sqliteShowStore.mjs",
   "src/server/runtimeShowStore.mjs",
   "src/server/apiServer.mjs",
   "src/engine/cueState.mjs",
@@ -47,6 +48,7 @@ const jsFiles = [
   "tests/runStatus.test.mjs",
   "tests/apiUx.test.mjs",
   "tests/showStore.test.mjs",
+  "tests/sqliteShowStore.test.mjs",
   "tests/apiServer.test.mjs",
   "tests/showApiClient.test.mjs"
 ];

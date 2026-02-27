@@ -21,6 +21,10 @@ Start the backend:
 npm run start:api
 ```
 
+Default local DB:
+- SQLite file at `data/openshow.sqlite`
+- Override path with `OPENSHOW_DB_PATH=/path/to/custom.sqlite`
+
 Available endpoints:
 - `GET /api/health`
 - `GET /api/shows`
@@ -40,6 +44,11 @@ The MVP UI now includes `Save to DB` and `Load from DB` actions that target `htt
   - `/api/shows/:showId`
 - In browser previews, the MVP now defaults to same-origin API calls (for example `https://<preview>.vercel.app/api/shows`).
 - Storage on Vercel defaults to in-memory runtime storage unless you configure a persistent backend; data may reset on cold starts/redeploys.
+
+## Store Modes
+- Local API default: SQLite (`OPENSHOW_STORE_MODE=sqlite`)
+- Vercel default: in-memory runtime (`OPENSHOW_STORE_MODE=memory`)
+- Runtime mode can be forced with `OPENSHOW_STORE_MODE`
 
 ## Development Map
 - Primary execution plan: [`DEVELOPMENT_MAP.md`](/home/tmsteph/open-show/DEVELOPMENT_MAP.md)
